@@ -20,38 +20,31 @@ function createFerryIcon(color: string) {
   return L.divIcon({
     className: "ferry-marker",
     html: `<div style="
-      width: 18px; height: 18px;
-      background: ${color};
-      border: 2px solid ${color};
-      border-radius: 50%;
-      box-shadow: 0 0 12px ${color}88, 0 0 24px ${color}44;
-      position: relative;
-    ">
-      <div style="
-        position: absolute; inset: 3px;
-        background: ${color};
-        border-radius: 50%;
-        animation: pulse-glow 2s ease-in-out infinite;
-      "></div>
-    </div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+      animation: bob 3s ease-in-out infinite;
+    ">⛴️</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
   });
 }
 
-function createDockIcon() {
+function createDockIcon(name: string) {
   return L.divIcon({
     className: "dock-marker",
     html: `<div style="
-      width: 10px; height: 10px;
-      background: hsl(190 100% 50%);
-      border: 1px solid hsl(190 100% 70%);
-      border-radius: 2px;
-      box-shadow: 0 0 8px hsl(190 100% 50% / 0.6);
-      transform: rotate(45deg);
-    "></div>`,
-    iconSize: [10, 10],
-    iconAnchor: [5, 5],
+      width: 24px; height: 24px;
+      background: hsl(35 60% 55%);
+      border: 2.5px solid hsl(30 30% 30%);
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      display: flex; align-items: center; justify-content: center;
+    "><span style="transform: rotate(45deg); font-size: 10px;">📍</span></div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 24],
   });
 }
 
@@ -73,22 +66,22 @@ export default function FerryMap({ onSelectRoute, selectedRouteId }: FerryMapPro
       attributionControl: true,
     });
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://osm.org/copyright">OSM</a>',
+    // Use CartoDB Voyager for a warm, friendly map style
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://osm.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 18,
     }).addTo(map);
 
     // Add dock markers
     ferryDocks.forEach((dock) => {
-      const marker = L.marker([dock.lat, dock.lng], { icon: createDockIcon() }).addTo(map);
+      const marker = L.marker([dock.lat, dock.lng], { icon: createDockIcon(dock.name) }).addTo(map);
       marker.bindTooltip(dock.name, {
-        className: "dock-tooltip",
         direction: "top",
-        offset: [0, -8],
+        offset: [0, -26],
       });
     });
 
-    // Add route lines
+    // Add route lines — thick, colorful, friendly
     ferryRoutes.forEach((route) => {
       const line = L.polyline(
         [
@@ -97,9 +90,10 @@ export default function FerryMap({ onSelectRoute, selectedRouteId }: FerryMapPro
         ],
         {
           color: route.color,
-          weight: 1.5,
-          opacity: 0.3,
-          dashArray: "6 8",
+          weight: 4,
+          opacity: 0.35,
+          dashArray: "8 12",
+          lineCap: "round",
         }
       ).addTo(map);
 
@@ -132,11 +126,10 @@ export default function FerryMap({ onSelectRoute, selectedRouteId }: FerryMapPro
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Remove old markers
     ferryMarkersRef.current.forEach((m) => m.remove());
     ferryMarkersRef.current = [];
 
-    positions.forEach((pos, i) => {
+    positions.forEach((pos) => {
       const route = ferryRoutes.find((r) => r.id === pos.routeId);
       if (!route) return;
 
@@ -146,12 +139,12 @@ export default function FerryMap({ onSelectRoute, selectedRouteId }: FerryMapPro
 
       const dir = pos.direction === "outbound" ? route.docks[1].name : route.docks[0].name;
       marker.bindTooltip(
-        `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; background: hsl(220 20% 9%); color: hsl(150 100% 75%); padding: 6px 10px; border: 1px solid ${route.color}; border-radius: 2px;">
+        `<div style="font-family: 'Quicksand', sans-serif; font-size: 12px; font-weight: 600;">
           <strong style="color: ${route.color}">${route.code}</strong><br/>
           → ${dir}<br/>
-          ETA: ${pos.eta} min | ${pos.speed.toFixed(1)} kn
+          ⏱ ${pos.eta} min · ${pos.speed.toFixed(1)} kn
         </div>`,
-        { className: "ferry-tooltip", direction: "top", offset: [0, -14], opacity: 0.95 }
+        { direction: "top", offset: [0, -20], opacity: 0.95 }
       );
 
       marker.on("click", () => onSelectRoute(route));
@@ -164,9 +157,9 @@ export default function FerryMap({ onSelectRoute, selectedRouteId }: FerryMapPro
     routeLinesRef.current.forEach((line, i) => {
       const route = ferryRoutes[i];
       if (route && selectedRouteId === route.id) {
-        line.setStyle({ weight: 3, opacity: 0.8, dashArray: undefined });
+        line.setStyle({ weight: 6, opacity: 0.7, dashArray: undefined });
       } else {
-        line.setStyle({ weight: 1.5, opacity: 0.3, dashArray: "6 8" });
+        line.setStyle({ weight: 4, opacity: 0.35, dashArray: "8 12" });
       }
     });
   }, [selectedRouteId]);

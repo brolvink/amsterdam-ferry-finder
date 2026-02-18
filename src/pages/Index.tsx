@@ -12,17 +12,14 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden scanlines">
-      {/* Map fills entire viewport */}
+    <div className="relative w-screen h-screen overflow-hidden bg-background">
       <FerryMap onSelectRoute={handleSelectRoute} selectedRouteId={selectedRoute?.id ?? null} />
 
-      {/* HUD overlay */}
       <HudOverlay
         onSelectRoute={(r) => handleSelectRoute(r)}
         selectedRouteId={selectedRoute?.id ?? null}
       />
 
-      {/* Schedule panel */}
       {selectedRoute && (
         <div className="absolute top-16 right-3 md:right-4 z-[1001] w-64 md:w-72">
           <FerrySchedule route={selectedRoute} onClose={() => setSelectedRoute(null)} />
