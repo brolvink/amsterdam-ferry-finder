@@ -71,3 +71,21 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Ferry schedule auto-refresh
+
+This project now keeps ferry timetable data in `src/data/ferryScheduleData.ts` and ships an updater script:
+
+```sh
+npm run update:ferry-schedules
+```
+
+The script expects a JSON source endpoint in `FERRY_SCHEDULE_SOURCE_URL` and optionally a bearer token in `FERRY_SCHEDULE_SOURCE_TOKEN`.
+
+An automated workflow is included at `.github/workflows/ferry-schedule-refresh.yml`:
+
+- Runs weekly on Monday at 04:00 UTC.
+- Can be triggered manually from GitHub Actions.
+- Commits updated `src/data/ferryScheduleData.ts` when timetable data changes.
+
+To switch to daily refresh, change the cron to `0 4 * * *` and set `FERRY_SCHEDULE_REFRESH_CADENCE=daily`.

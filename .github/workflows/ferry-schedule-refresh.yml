@@ -1,0 +1,43 @@
+name: Refresh Ferry Schedule
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update ferry schedule
+        env:
+          FERRY_SCHEDULE_SOURCE_URL: ${{ secrets.FERRY_SCHEDULE_SOURCE_URL }}
+          FERRY_SCHEDULE_SOURCE_TOKEN: ${{ secrets.FERRY_SCHEDULE_SOURCE_TOKEN }}
+          FERRY_SCHEDULE_REFRESH_CADENCE: weekly
+        run: npm run update:ferry-schedules
+
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/data/ferryScheduleData.ts
+          git commit -m "chore: refresh ferry schedule data"
+          git push

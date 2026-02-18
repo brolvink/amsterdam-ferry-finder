@@ -1,0 +1,127 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic:
+        - generic:
+          - img
+        - generic:
+          - button "📍" [ref=e11] [cursor=pointer]:
+            - generic [ref=e13]: 📍
+          - button "📍" [ref=e14] [cursor=pointer]:
+            - generic [ref=e16]: 📍
+          - button "📍" [ref=e17] [cursor=pointer]:
+            - generic [ref=e19]: 📍
+          - button "📍" [ref=e20] [cursor=pointer]:
+            - generic [ref=e22]: 📍
+          - button "📍" [ref=e23] [cursor=pointer]:
+            - generic [ref=e25]: 📍
+          - button "📍" [ref=e26] [cursor=pointer]:
+            - generic [ref=e28]: 📍
+          - button "📍" [ref=e29] [cursor=pointer]:
+            - generic [ref=e31]: 📍
+          - button "📍" [ref=e32] [cursor=pointer]:
+            - generic [ref=e34]: 📍
+          - button "📍" [ref=e35] [cursor=pointer]:
+            - generic [ref=e37]: 📍
+          - button "📍" [ref=e38] [cursor=pointer]:
+            - generic [ref=e40]: 📍
+          - button "Ferry" [ref=e41] [cursor=pointer]:
+            - img "Ferry" [ref=e43]
+          - button "Ferry" [ref=e44] [cursor=pointer]:
+            - img "Ferry" [ref=e46]
+          - button "Ferry" [ref=e47] [cursor=pointer]:
+            - img "Ferry" [ref=e49]
+          - button "Ferry" [ref=e50] [cursor=pointer]:
+            - img "Ferry" [ref=e52]
+          - button "Ferry" [ref=e53] [cursor=pointer]:
+            - img "Ferry" [ref=e55]
+          - button "Ferry" [ref=e56] [cursor=pointer]:
+            - img "Ferry" [ref=e58]
+          - button "Ferry" [ref=e59] [cursor=pointer]:
+            - img "Ferry" [ref=e61]
+          - button "Ferry" [ref=e62] [cursor=pointer]:
+            - img "Ferry" [ref=e64]
+          - button "Ferry" [ref=e65] [cursor=pointer]:
+            - img "Ferry" [ref=e67]
+          - button "Ferry" [ref=e68] [cursor=pointer]:
+            - img "Ferry" [ref=e70]
+          - button "Ferry" [ref=e71] [cursor=pointer]:
+            - img "Ferry" [ref=e73]
+          - button "Ferry" [ref=e74] [cursor=pointer]:
+            - img "Ferry" [ref=e76]
+      - generic:
+        - generic [ref=e77]:
+          - button "Zoom in" [ref=e78] [cursor=pointer]: +
+          - button "Zoom out" [ref=e79] [cursor=pointer]: −
+        - generic [ref=e80]:
+          - link "Leaflet" [ref=e81] [cursor=pointer]:
+            - /url: https://leafletjs.com
+            - img [ref=e82]
+            - text: Leaflet
+          - text: "| ©"
+          - link "OSM" [ref=e86] [cursor=pointer]:
+            - /url: https://osm.org/copyright
+          - text: ©
+          - link "CARTO" [ref=e87] [cursor=pointer]:
+            - /url: https://carto.com/
+    - generic:
+      - generic:
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - generic [ref=e90]:
+              - generic [ref=e91]: ⛴️
+              - generic [ref=e92]: ⛴️
+            - heading "ferrynice" [level=1] [ref=e93]
+          - paragraph [ref=e94]: Harbor Life Guidebook
+        - generic [ref=e95]:
+          - paragraph [ref=e96]: 20:50
+          - paragraph [ref=e97]: wo 18 feb
+          - paragraph [ref=e98]: 1°C · Partly cloudy
+          - paragraph [ref=e99]:
+            - img [ref=e100]
+            - text: 28 km/h wind · feels -6°C
+          - generic [ref=e105]:
+            - img [ref=e106]
+            - text: Night Chill
+      - generic:
+        - generic [ref=e109]:
+          - button "Open F3 route card" [ref=e110] [cursor=pointer]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: F3
+              - generic [ref=e114]: Buiksloterweg
+            - generic [ref=e115]: ●
+          - button "Open F2 route card" [ref=e116] [cursor=pointer]:
+            - generic [ref=e118]:
+              - generic [ref=e119]: F2
+              - generic [ref=e120]: IJplein
+            - generic [ref=e121]: ●
+          - button "Open F4 route card" [ref=e122] [cursor=pointer]:
+            - generic [ref=e124]:
+              - generic [ref=e125]: F4
+              - generic [ref=e126]: NDSM
+            - generic [ref=e127]: ●
+          - button "Open F6 route card" [ref=e128] [cursor=pointer]:
+            - generic [ref=e130]:
+              - generic [ref=e131]: F6
+              - generic [ref=e132]: Distelweg
+            - generic [ref=e133]: ●
+          - button "Open F1 route card" [ref=e134] [cursor=pointer]:
+            - generic [ref=e136]:
+              - generic [ref=e137]: F1
+              - generic [ref=e138]: Zamenhofstraat / Azartplein
+            - generic [ref=e139]: ●
+          - button "Open F7 route card" [ref=e140] [cursor=pointer]:
+            - generic [ref=e142]:
+              - generic [ref=e143]: F7
+              - generic [ref=e144]: NDSM
+            - generic [ref=e145]: ●
+        - generic [ref=e147]:
+          - generic [ref=e148]:
+            - img [ref=e149]
+            - text: 12 sailing
+          - generic [ref=e153]:
+            - img [ref=e154]
+            - text: 6 harbors

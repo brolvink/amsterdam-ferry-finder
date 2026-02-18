@@ -6,47 +6,47 @@
 
 @layer base {
   :root {
-    --background: 80 30% 92%;
-    --foreground: 30 30% 20%;
+    --background: 88 34% 90%;
+    --foreground: 28 30% 22%;
 
-    --card: 40 40% 95%;
-    --card-foreground: 30 30% 20%;
+    --card: 44 48% 94%;
+    --card-foreground: 28 30% 22%;
 
-    --popover: 40 40% 95%;
-    --popover-foreground: 30 30% 20%;
+    --popover: 44 48% 94%;
+    --popover-foreground: 28 30% 22%;
 
-    --primary: 145 45% 45%;
+    --primary: 147 38% 41%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 35 60% 65%;
-    --secondary-foreground: 30 30% 15%;
+    --secondary: 39 63% 66%;
+    --secondary-foreground: 28 30% 18%;
 
-    --muted: 80 20% 85%;
-    --muted-foreground: 30 15% 45%;
+    --muted: 82 22% 83%;
+    --muted-foreground: 28 20% 32%;
 
-    --accent: 195 55% 55%;
+    --accent: 193 56% 58%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 60% 55%;
+    --destructive: 0 58% 54%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 25% 75%;
-    --input: 30 25% 75%;
-    --ring: 145 45% 45%;
+    --border: 31 27% 70%;
+    --input: 31 27% 70%;
+    --ring: 147 38% 41%;
 
-    --radius: 1rem;
+    --radius: 1.1rem;
 
-    --wood-shadow: 0 4px 12px hsl(30 30% 20% / 0.12), 0 1px 3px hsl(30 30% 20% / 0.08);
-    --wood-shadow-lg: 0 8px 24px hsl(30 30% 20% / 0.15), 0 2px 6px hsl(30 30% 20% / 0.1);
+    --wood-shadow: 0 6px 16px hsl(28 22% 22% / 0.14), 0 1px 3px hsl(28 22% 22% / 0.09);
+    --wood-shadow-lg: 0 10px 26px hsl(28 22% 22% / 0.17), 0 2px 8px hsl(28 22% 22% / 0.12);
 
-    --sidebar-background: 40 40% 95%;
-    --sidebar-foreground: 30 30% 20%;
-    --sidebar-primary: 145 45% 45%;
+    --sidebar-background: 44 48% 94%;
+    --sidebar-foreground: 28 30% 22%;
+    --sidebar-primary: 147 38% 41%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 195 55% 55%;
+    --sidebar-accent: 193 56% 58%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 30 25% 75%;
-    --sidebar-ring: 145 45% 45%;
+    --sidebar-border: 31 27% 70%;
+    --sidebar-ring: 147 38% 41%;
   }
 }
 
@@ -58,6 +58,77 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Quicksand', sans-serif;
+    background-image:
+      radial-gradient(circle at 20% 20%, hsl(88 34% 94% / 0.85) 0%, transparent 50%),
+      radial-gradient(circle at 80% 10%, hsl(193 56% 88% / 0.55) 0%, transparent 40%),
+      linear-gradient(180deg, hsl(88 34% 90%) 0%, hsl(87 30% 88%) 100%);
+  }
+
+  .weather-theme {
+    transition: filter 0.35s ease, background-color 0.35s ease;
+  }
+
+  .weather-theme.weather-theme-night {
+    --background: 209 30% 14%;
+    --foreground: 210 20% 90%;
+    --card: 39 41% 87%;
+    --card-foreground: 26 30% 20%;
+    --muted: 37 24% 77%;
+    --muted-foreground: 29 18% 33%;
+    --border: 32 26% 58%;
+    --input: 32 26% 58%;
+    --primary: 160 34% 48%;
+    --accent: 190 44% 52%;
+    --secondary: 34 44% 66%;
+    --secondary-foreground: 25 30% 20%;
+  }
+
+  .weather-theme.weather-theme-cold {
+    --primary: 169 34% 43%;
+    --accent: 199 50% 56%;
+    --secondary: 203 28% 60%;
+  }
+
+  .weather-theme.weather-theme-wet {
+    --muted: 204 22% 28%;
+    --border: 204 26% 38%;
+  }
+
+  .weather-theme.weather-theme-night .wood-panel {
+    background-image:
+      radial-gradient(circle at 22% 18%, hsl(44 70% 96% / 0.92) 0%, transparent 44%),
+      linear-gradient(146deg, hsl(42 42% 89%) 0%, hsl(36 35% 84%) 56%, hsl(39 40% 88%) 100%);
+    border-color: hsl(32 24% 58%);
+    box-shadow: 0 10px 22px hsl(210 32% 8% / 0.34), 0 2px 5px hsl(210 26% 8% / 0.2);
+  }
+
+  .weather-theme.weather-theme-night .wood-panel::after {
+    background-image: repeating-linear-gradient(
+      45deg,
+      hsl(34 20% 42% / 0.1) 0,
+      hsl(34 20% 42% / 0.1) 2px,
+      transparent 2px,
+      transparent 7px
+    );
+    opacity: 0.5;
+  }
+
+  .weather-theme.weather-theme-night .inventory-slot {
+    background-image:
+      radial-gradient(circle at 18% 15%, hsl(45 80% 96% / 0.85) 0%, transparent 45%),
+      linear-gradient(155deg, hsl(42 44% 90%) 0%, hsl(36 34% 83%) 50%, hsl(39 39% 87%) 100%);
+    border-color: hsl(32 24% 56%);
+  }
+
+  .weather-theme.weather-theme-night .inventory-slot--active {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2), 0 10px 22px hsl(210 32% 8% / 0.34);
+  }
+
+  .weather-theme.weather-theme-night .leaf-badge {
+    background: hsl(147 42% 34% / 0.35);
+    color: hsl(147 64% 86%);
+    border-color: hsl(147 52% 58% / 0.45);
   }
 }
 
@@ -67,47 +138,205 @@
   }
 
   .wood-panel {
-    @apply bg-card border-2 border-border rounded-2xl;
+    @apply bg-card border-2 border-border rounded-[1.25rem] relative;
     box-shadow: var(--wood-shadow);
-    background-image: linear-gradient(
-      135deg,
-      hsl(40 40% 95%) 0%,
-      hsl(40 35% 92%) 50%,
-      hsl(40 40% 95%) 100%
+    background-image:
+      radial-gradient(circle at 25% 25%, hsl(44 50% 97% / 0.9) 0%, transparent 45%),
+      linear-gradient(145deg, hsl(44 50% 96%) 0%, hsl(40 42% 91%) 52%, hsl(44 48% 95%) 100%);
+  }
+
+  .wood-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background-image: repeating-linear-gradient(
+      45deg,
+      hsl(30 20% 60% / 0.07) 0,
+      hsl(30 20% 60% / 0.07) 2px,
+      transparent 2px,
+      transparent 7px
     );
+    opacity: 0.65;
   }
 
   .wood-panel-dark {
-    @apply border-2 rounded-2xl;
-    background: hsl(30 25% 35%);
-    border-color: hsl(30 20% 28%);
-    box-shadow: var(--wood-shadow), inset 0 1px 0 hsl(30 25% 42%);
-    color: hsl(40 40% 95%);
+    @apply border-2 rounded-[1.25rem] relative;
+    background:
+      linear-gradient(150deg, hsl(30 26% 40%) 0%, hsl(28 23% 34%) 100%);
+    border-color: hsl(27 20% 27%);
+    box-shadow: var(--wood-shadow), inset 0 1px 0 hsl(31 30% 49%);
+    color: hsl(45 48% 95%);
   }
 
   .leaf-badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
-    background: hsl(145 45% 45% / 0.15);
-    color: hsl(145 45% 35%);
-    border: 1px solid hsl(145 45% 45% / 0.3);
+    background: hsl(147 38% 41% / 0.2);
+    color: hsl(147 58% 22%);
+    border: 1px solid hsl(147 38% 41% / 0.35);
   }
 
-  .ac-button {
-    @apply px-4 py-2 rounded-full font-semibold text-sm transition-all;
-    background: hsl(145 45% 45%);
-    color: white;
-    box-shadow: 0 3px 0 hsl(145 45% 32%), var(--wood-shadow);
-    transform: translateY(0);
+  .inventory-slot {
+    @apply wood-panel px-3 py-2 flex items-center gap-2.5 text-left transition-all;
   }
 
-  .ac-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 0 hsl(145 45% 32%), var(--wood-shadow-lg);
+  .inventory-slot:hover {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: var(--wood-shadow-lg);
   }
 
-  .ac-button:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 hsl(145 45% 32%);
+  .inventory-slot:active {
+    transform: translateY(1px) scale(0.985);
+  }
+
+  .inventory-slot--active {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2), var(--wood-shadow-lg);
+    animation: slot-pop 0.3s ease-out;
+  }
+
+  .ac-atmosphere {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: 500;
+  }
+
+  .ac-sun-glow {
+    position: absolute;
+    top: -120px;
+    right: -80px;
+    width: 320px;
+    height: 320px;
+    border-radius: 999px;
+    background: radial-gradient(circle, hsl(46 95% 75% / 0.45) 0%, hsl(46 95% 75% / 0.18) 42%, transparent 75%);
+  }
+
+  .ac-moon-glow {
+    position: absolute;
+    top: -90px;
+    right: -60px;
+    width: 280px;
+    height: 280px;
+    border-radius: 999px;
+    background: radial-gradient(circle, hsl(210 85% 90% / 0.3) 0%, hsl(210 85% 90% / 0.12) 44%, transparent 72%);
+  }
+
+  .ac-cloud {
+    position: absolute;
+    width: 180px;
+    height: 54px;
+    border-radius: 999px;
+    background: hsl(0 0% 100% / 0.44);
+    filter: blur(1px);
+    animation: drift 22s linear infinite;
+  }
+
+  .ac-cloud::before,
+  .ac-cloud::after {
+    content: '';
+    position: absolute;
+    background: inherit;
+    border-radius: 999px;
+  }
+
+  .ac-cloud::before {
+    width: 70px;
+    height: 50px;
+    top: -26px;
+    left: 24px;
+  }
+
+  .ac-cloud::after {
+    width: 80px;
+    height: 44px;
+    top: -16px;
+    right: 30px;
+  }
+
+  .ac-water-shimmer {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 34%;
+    background:
+      linear-gradient(180deg, transparent 0%, hsl(193 56% 58% / 0.15) 25%, hsl(193 56% 58% / 0.26) 100%),
+      repeating-linear-gradient(
+        -8deg,
+        hsl(193 65% 97% / 0.08) 0,
+        hsl(193 65% 97% / 0.08) 3px,
+        transparent 3px,
+        transparent 12px
+      );
+    animation: tide 5s ease-in-out infinite;
+  }
+
+  .ac-rain {
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat;
+    pointer-events: none;
+  }
+
+  .ac-rain--far {
+    opacity: 0.22;
+    background-image: linear-gradient(
+      172deg,
+      transparent 0%,
+      transparent 46%,
+      hsl(201 80% 86% / 0.45) 48%,
+      transparent 50%
+    );
+    background-size: 16px 20px;
+    animation: rain-fall 0.9s linear infinite;
+  }
+
+  .ac-rain--near {
+    opacity: 0.3;
+    background-image: linear-gradient(
+      172deg,
+      transparent 0%,
+      transparent 42%,
+      hsl(202 90% 93% / 0.5) 46%,
+      transparent 52%
+    );
+    background-size: 24px 28px;
+    animation: rain-fall 0.55s linear infinite;
+  }
+
+  .ac-atmosphere--night .ac-cloud {
+    opacity: 0.33;
+    filter: blur(1.5px);
+  }
+
+  .ac-atmosphere--night .ac-water-shimmer {
+    background:
+      linear-gradient(180deg, transparent 0%, hsl(206 58% 46% / 0.12) 25%, hsl(207 66% 28% / 0.35) 100%),
+      repeating-linear-gradient(
+        -8deg,
+        hsl(208 50% 90% / 0.08) 0,
+        hsl(208 50% 90% / 0.08) 3px,
+        transparent 3px,
+        transparent 12px
+      );
+  }
+
+  .ac-atmosphere--cold .ac-cloud {
+    opacity: 0.3;
+    animation-duration: 34s;
+  }
+
+  .ac-atmosphere--cold .ac-water-shimmer {
+    animation-duration: 7s;
+  }
+
+  .ac-atmosphere--wet .ac-cloud {
+    opacity: 0.22;
+  }
+
+  .ac-atmosphere--windy .ac-cloud {
+    animation-duration: 14s;
   }
 
   .bobbing {
@@ -152,19 +381,40 @@
   50% { opacity: 0.6; }
 }
 
+@keyframes slot-pop {
+  0% { transform: scale(0.96); }
+  65% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+@keyframes drift {
+  0% { transform: translateX(-220px); }
+  100% { transform: translateX(calc(100vw + 260px)); }
+}
+
+@keyframes tide {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes rain-fall {
+  0% { background-position: 0 0; }
+  100% { background-position: -20px 70px; }
+}
+
 /* Leaflet map — warm, soft, Animal Crossing style */
 .leaflet-container {
-  background: hsl(195 50% 80%) !important;
+  background: hsl(195 63% 84%) !important;
 }
 
 .leaflet-tile-pane {
-  filter: saturate(1.1) brightness(1.05) contrast(0.95);
+  filter: saturate(0.88) brightness(1.08) contrast(0.88) sepia(0.12);
 }
 
 .leaflet-control-zoom a {
-  background: hsl(40 40% 95%) !important;
-  color: hsl(30 30% 20%) !important;
-  border-color: hsl(30 25% 75%) !important;
+  background: hsl(45 45% 94%) !important;
+  color: hsl(28 30% 20%) !important;
+  border-color: hsl(31 27% 70%) !important;
   border-radius: 12px !important;
   font-family: 'Baloo 2', cursive !important;
 }
@@ -173,28 +423,92 @@
   border-radius: 14px !important;
   overflow: hidden;
   box-shadow: var(--wood-shadow) !important;
-  border: 2px solid hsl(30 25% 75%) !important;
+  border: 2px solid hsl(31 27% 70%) !important;
+}
+
+.leaflet-bottom.leaflet-right .leaflet-control-zoom {
+  margin: 0 14px 14px 0 !important;
 }
 
 .leaflet-control-attribution {
-  background: hsl(40 40% 95% / 0.9) !important;
-  color: hsl(30 15% 45%) !important;
+  background: hsl(44 48% 94% / 0.88) !important;
+  color: hsl(28 15% 40%) !important;
   font-size: 9px !important;
-  border-radius: 8px 0 0 0 !important;
+  border-radius: 10px 0 0 0 !important;
   font-family: 'Quicksand', sans-serif !important;
 }
 
 .leaflet-control-attribution a {
-  color: hsl(145 45% 40%) !important;
+  color: hsl(147 42% 35%) !important;
+}
+
+.weather-theme.weather-theme-night .leaflet-tile-pane {
+  filter: saturate(0.68) brightness(0.84) contrast(0.93) sepia(0.34) hue-rotate(-10deg);
+}
+
+.weather-theme.weather-theme-cold .leaflet-tile-pane {
+  filter: saturate(0.7) brightness(0.93) contrast(0.92) hue-rotate(8deg);
+}
+
+.weather-theme.weather-theme-night .leaflet-container {
+  background: hsl(207 36% 16%) !important;
+}
+
+.leaflet-container.map-theme-night .leaflet-control-zoom a {
+  background: hsl(39 42% 86%) !important;
+  color: hsl(27 29% 20%) !important;
+  border-color: hsl(32 24% 58%) !important;
+}
+
+.leaflet-container.map-theme-night .leaflet-control-zoom {
+  border-color: hsl(32 24% 58%) !important;
+  box-shadow: 0 8px 20px hsl(210 26% 6% / 0.34) !important;
+}
+
+.leaflet-container.map-theme-night .leaflet-control-attribution {
+  background: hsl(38 38% 84% / 0.9) !important;
+  color: hsl(26 15% 34%) !important;
+}
+
+.leaflet-container.map-theme-night .leaflet-tooltip {
+  background: hsl(42 45% 89%) !important;
+  color: hsl(26 30% 22%) !important;
+  border-color: hsl(32 24% 58%) !important;
+}
+
+.leaflet-container.map-theme-night .leaflet-tooltip::before {
+  border-top-color: hsl(32 24% 58%) !important;
 }
 
 .ferry-marker {
   filter: none;
-  transition: transform 0.3s ease;
+  will-change: transform;
 }
 
-.ferry-marker:hover {
-  transform: scale(1.2);
+.ferry-marker__icon {
+  transform-origin: center center;
+  transition: filter 0.2s ease;
+}
+
+.ferry-marker__icon--moving {
+  animation: none;
+}
+
+.ferry-marker__icon--docked {
+  animation: none;
+}
+
+.ferry-marker:hover .ferry-marker__icon {
+  filter: brightness(1.08);
+}
+
+.leaflet-marker-pane .ferry-marker-img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .dock-marker {
@@ -203,9 +517,9 @@
 
 /* Custom tooltip styling */
 .leaflet-tooltip {
-  background: hsl(40 40% 95%) !important;
-  color: hsl(30 30% 20%) !important;
-  border: 2px solid hsl(30 25% 75%) !important;
+  background: hsl(44 48% 94%) !important;
+  color: hsl(28 30% 22%) !important;
+  border: 2px solid hsl(31 27% 70%) !important;
   border-radius: 12px !important;
   font-family: 'Quicksand', sans-serif !important;
   font-weight: 600 !important;
@@ -214,5 +528,5 @@
 }
 
 .leaflet-tooltip::before {
-  border-top-color: hsl(30 25% 75%) !important;
+  border-top-color: hsl(31 27% 70%) !important;
 }
