@@ -1,22 +1,51 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export default function SeagullCursor() {
+    const frames = useMemo(() => ["/seagul-1.png", "/seagul-2.png", "/seagul-3.png"], []);
+    const clickFrame = "/seagul-click.png";
+
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [rotation, setRotation] = useState(0);
     const [isMoving, setIsMoving] = useState(false);
     const [isClicked, setIsClicked] = useState(false);
     const [isMovingRight, setIsMovingRight] = useState(false);
     const [frameIndex, setFrameIndex] = useState(0);
+    const [framesReady, setFramesReady] = useState(false);
+
     const prevPosition = useRef({ x: 0, y: 0 });
     const timeoutRef = useRef<number | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const ambientSoundRef = useRef<HTMLAudioElement | null>(null);
     const ambientTimeoutRef = useRef<number | null>(null);
     const lastClickSoundRef = useRef(0);
-    const frames = ["/seagul-1.png", "/seagul-2.png", "/seagul-3.png"];
 
     useEffect(() => {
-        if (!isMoving || isClicked) {
+        let cancelled = false;
+
+        const preload = (src: string) =>
+            new Promise<void>((resolve) => {
+                const img = new Image();
+                img.decoding = "async";
+                img.src = src;
+                if (img.complete) {
+                    resolve();
+                    return;
+                }
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+            });
+
+        void Promise.all([...frames, clickFrame].map(preload)).then(() => {
+            if (!cancelled) setFramesReady(true);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [frames]);
+
+    useEffect(() => {
+        if (!framesReady || !isMoving || isClicked) {
             setFrameIndex(0);
             return;
         }
@@ -26,7 +55,7 @@ export default function SeagullCursor() {
         }, 90);
 
         return () => window.clearInterval(interval);
-    }, [isMoving, isClicked, frames.length]);
+    }, [frames.length, framesReady, isClicked, isMoving]);
 
     useEffect(() => {
         document.documentElement.classList.add("seagull-cursor-active");
@@ -99,9 +128,10 @@ export default function SeagullCursor() {
             return true;
         };
 
-        const handleMouseMove = (e: MouseEvent) => {
-            const { clientX: x, clientY: y } = e;
+        const handlePointerMove = (event: PointerEvent) => {
+            if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
 
+            const { clientX: x, clientY: y } = event;
             const dx = x - prevPosition.current.x;
             const dy = y - prevPosition.current.y;
 
@@ -110,10 +140,10 @@ export default function SeagullCursor() {
                 if (dx < -1) setIsMovingRight(false);
 
                 let targetAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-                // Keep tilt natural while mirror handles facing direction.
                 if (targetAngle > 90) targetAngle -= 180;
                 if (targetAngle < -90) targetAngle += 180;
-                setRotation(prev => {
+
+                setRotation((prev) => {
                     const diff = ((targetAngle - prev + 180) % 360) - 180;
                     return prev + diff * 0.15;
                 });
@@ -127,21 +157,26 @@ export default function SeagullCursor() {
             prevPosition.current = { x, y };
         };
 
-        const handleMouseDown = () => {
+        const handlePointerDown = (event: PointerEvent) => {
+            if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
             const didPlayClickSound = playSeagullClickSound();
             setIsClicked(didPlayClickSound);
         };
-        const handleMouseUp = () => setIsClicked(false);
 
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mousedown", handleMouseDown);
-        window.addEventListener("mouseup", handleMouseUp);
+        const handlePointerUp = (event: PointerEvent) => {
+            if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
+            setIsClicked(false);
+        };
+
+        window.addEventListener("pointermove", handlePointerMove);
+        window.addEventListener("pointerdown", handlePointerDown);
+        window.addEventListener("pointerup", handlePointerUp);
 
         return () => {
             document.documentElement.classList.remove("seagull-cursor-active");
-            window.removeEventListener("mousemove", handleMouseMove);
-            window.removeEventListener("mousedown", handleMouseDown);
-            window.removeEventListener("mouseup", handleMouseUp);
+            window.removeEventListener("pointermove", handlePointerMove);
+            window.removeEventListener("pointerdown", handlePointerDown);
+            window.removeEventListener("pointerup", handlePointerUp);
             if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
             if (ambientTimeoutRef.current) window.clearTimeout(ambientTimeoutRef.current);
             if (ambientSoundRef.current) ambientSoundRef.current.pause();
@@ -164,7 +199,7 @@ export default function SeagullCursor() {
             }}
         >
             <img
-                src={isClicked ? "/seagul-click.png" : frames[frameIndex]}
+                src={isClicked ? clickFrame : frames[frameIndex]}
                 alt=""
                 aria-hidden="true"
                 draggable={false}

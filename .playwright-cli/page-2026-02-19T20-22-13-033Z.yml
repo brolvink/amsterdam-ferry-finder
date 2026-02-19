@@ -1,0 +1,119 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic:
+        - generic:
+          - img
+        - generic:
+          - button "Marker" [ref=e12]
+          - button "Marker" [ref=e13]
+          - button "Marker" [ref=e14]
+          - button "Marker" [ref=e15]
+          - button "Marker" [ref=e16]
+          - button "Marker" [ref=e17]
+          - button "Marker" [ref=e18]
+          - button "Marker" [ref=e19]
+          - button "Marker" [ref=e20]
+          - button "Marker" [ref=e21]
+          - button "Marker" [ref=e22]
+          - button "Marker" [ref=e23]
+          - button "Marker" [ref=e24]
+          - button "Ferry" [ref=e25]:
+            - img "Ferry" [ref=e142]
+          - button "Ferry" [ref=e28]:
+            - img "Ferry" [ref=e144]
+          - button "Ferry" [ref=e31]:
+            - img "Ferry" [ref=e146]
+          - button "Ferry" [ref=e34]:
+            - img "Ferry" [ref=e148]
+          - button "Ferry" [ref=e37]:
+            - img "Ferry" [ref=e150]
+          - button "Ferry" [ref=e40]:
+            - img "Ferry" [ref=e152]
+          - button "Ferry" [ref=e43]:
+            - img "Ferry" [ref=e154]
+          - button "Ferry" [ref=e46]:
+            - img "Ferry" [ref=e156]
+          - button "Ferry" [ref=e49]:
+            - img "Ferry" [ref=e158]
+          - button "Ferry" [ref=e52]:
+            - img "Ferry" [ref=e160]
+      - generic [ref=e55]:
+        - link "Leaflet" [ref=e56]:
+          - /url: https://leafletjs.com
+          - img [ref=e57]
+          - text: Leaflet
+        - text: "| ©"
+        - link "OSM" [ref=e61]:
+          - /url: https://osm.org/copyright
+        - text: ©
+        - link "CARTO" [ref=e62]:
+          - /url: https://carto.com/
+    - generic:
+      - generic:
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]:
+              - img "Ferry" [ref=e67]
+              - heading "ferrynice" [level=1] [ref=e68]
+            - generic [ref=e69]:
+              - button "Use automatic day and night mode" [ref=e70]: AUTO
+              - button "Switch to day mode" [ref=e71]:
+                - img [ref=e72]
+              - button "Turn music off" [ref=e79]:
+                - img [ref=e80]
+          - generic [ref=e84]:
+            - paragraph [ref=e85]: Harbor Life Guidebook
+            - generic [ref=e86]:
+              - generic [ref=e87]: Ferry Island
+              - button "Rename island" [ref=e88]:
+                - img [ref=e89]
+          - generic [ref=e92]:
+            - generic [ref=e93]: 🕊️
+            - paragraph [ref=e94]: "Scout Gull says: bundle up, it is crisp on deck."
+        - generic [ref=e95]:
+          - paragraph [ref=e96]: 21:22
+          - paragraph [ref=e97]: do 19 feb
+          - paragraph [ref=e98]: 3°C · Partly cloudy
+          - paragraph [ref=e161]:
+            - img [ref=e162]
+            - text: 15 km/h wind · feels -2°C
+          - generic [ref=e100]:
+            - img [ref=e101]
+            - text: Night Chill
+      - generic [ref=e104]:
+        - button "Open F3 route card" [ref=e105]:
+          - generic [ref=e107]:
+            - generic [ref=e108]: F3
+            - generic [ref=e109]: Centraal Station ↔ Buiksloterweg
+          - generic [ref=e110]: ●
+        - button "Open F2 route card" [ref=e111]:
+          - generic [ref=e113]:
+            - generic [ref=e114]: F2
+            - generic [ref=e115]: Centraal Station (East) ↔ IJplein
+          - generic [ref=e116]: ●
+        - button "Open F4 route card" [ref=e117]:
+          - generic [ref=e119]:
+            - generic [ref=e120]: F4
+            - generic [ref=e121]: Centraal Station ↔ NDSM
+          - generic [ref=e122]: ●
+        - button "Open F6 route card" [ref=e123]:
+          - generic [ref=e125]:
+            - generic [ref=e126]: F6
+            - generic [ref=e127]: Pontsteiger ↔ Distelweg
+          - generic [ref=e128]: ●
+        - button "Open F1 route card" [ref=e129]:
+          - generic [ref=e131]:
+            - generic [ref=e132]: F1
+            - generic [ref=e133]: Azartplein ↔ Zamenhofstraat
+          - generic [ref=e134]: ●
+        - button "Open F7 route card" [ref=e135]:
+          - generic [ref=e137]:
+            - generic [ref=e138]: F7
+            - generic [ref=e139]: Pontsteiger ↔ NDSM
+          - generic [ref=e140]: ●
+    - generic:
+      - img

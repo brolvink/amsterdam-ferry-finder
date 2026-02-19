@@ -67,6 +67,18 @@ export default function HudOverlay({
         ? "Crisp Morning"
         : "Island Time"
     : "Island Time";
+  const sortedFerryRoutes = useMemo(
+    () =>
+      [...ferryRoutes].sort((a, b) => {
+        const aNum = Number(a.code.replace(/^f/i, ""));
+        const bNum = Number(b.code.replace(/^f/i, ""));
+        if (Number.isNaN(aNum) || Number.isNaN(bNum)) {
+          return a.code.localeCompare(b.code);
+        }
+        return aNum - bNum;
+      }),
+    [],
+  );
   const mascotMessage = useMemo(() => {
     if (!weather) return "Scout Gull says: mellow tides and smooth routes.";
     if (!weather.isDay) {
@@ -276,7 +288,7 @@ export default function HudOverlay({
       <div className="flex items-end justify-between mt-auto gap-2">
         {/* Route list — like AC inventory slots */}
         <div className="pointer-events-auto flex flex-col gap-1.5 max-w-[210px]">
-          {ferryRoutes.map((route) => (
+          {sortedFerryRoutes.map((route) => (
             <button
               key={route.id}
               onClick={() => handleRouteClick(route)}
