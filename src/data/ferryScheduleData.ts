@@ -42,7 +42,7 @@ const ferryScheduleData: FerryScheduleData = {
     },
     {
       id: "f3",
-      frequency: "Every 10-30 min",
+      frequency: "Every 10 min",
       duration: 14,
       operatingHours: "07:00 - 02:00",
       status: "active",
@@ -51,7 +51,7 @@ const ferryScheduleData: FerryScheduleData = {
       id: "f4",
       frequency: "Every 15 min",
       duration: 6,
-      operatingHours: "06:30 - 19:30 (Mon-Fri)",
+      operatingHours: "06:30 - 22:30 (Mon-Fri)",
       status: "active",
     },
     {

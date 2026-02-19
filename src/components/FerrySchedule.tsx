@@ -13,7 +13,7 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
     route.status === "active" ? "Smooth Sailing" : route.status === "delayed" ? "Running Late" : "In Harbor";
 
   return (
-    <div className="wood-panel overflow-hidden animate-bounce-in backdrop-blur-[1px]">
+    <div className="wood-panel-dark-card overflow-hidden animate-bounce-in backdrop-blur-[1px]">
       {/* Colored header bar */}
       <div
         className="px-4 py-3 flex items-center justify-between border-b border-border/80"
@@ -25,7 +25,7 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
             style={{ background: route.color }}
           />
           <span
-            className="font-display text-sm font-bold tracking-wide text-foreground px-1.5 py-0.5 rounded-md border"
+            className="font-display text-sm font-bold tracking-wide text-card-foreground px-1.5 py-0.5 rounded-md border"
             style={{
               background: `${route.color}20`,
               borderColor: `${route.color}66`,
@@ -37,7 +37,7 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
         </div>
         <button
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-muted/70"
+          className="text-muted-foreground hover:text-card-foreground transition-colors p-1 rounded-full hover:bg-muted/70"
           aria-label="Close route details"
         >
           <X size={14} />
@@ -45,7 +45,7 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
       </div>
 
       <div className="p-4">
-        <h3 className="text-foreground font-display font-bold text-base mb-0.5">{route.name}</h3>
+        <h3 className="text-card-foreground font-display font-bold text-base mb-0.5">{route.name}</h3>
         <p className="text-muted-foreground text-xs mb-4 font-medium">
           {route.docks[0].name} ↔ {route.docks[1].name}
         </p>
@@ -56,19 +56,19 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
             <div className="flex items-center gap-1 text-muted-foreground text-[10px] uppercase tracking-wider mb-1 font-semibold">
               <Clock size={10} /> Sailing Rhythm
             </div>
-            <p className="text-foreground text-xs font-bold">{route.frequency}</p>
+            <p className="text-card-foreground text-xs font-bold">{route.frequency}</p>
           </div>
           <div className="bg-muted/45 p-2.5 rounded-xl border border-border/60">
             <div className="flex items-center gap-1 text-muted-foreground text-[10px] uppercase tracking-wider mb-1 font-semibold">
               <Navigation size={10} /> Crossing Time
             </div>
-            <p className="text-foreground text-xs font-bold">{route.duration} min</p>
+            <p className="text-card-foreground text-xs font-bold">{route.duration} min</p>
           </div>
           <div className="bg-muted/45 p-2.5 rounded-xl border border-border/60">
             <div className="flex items-center gap-1 text-muted-foreground text-[10px] uppercase tracking-wider mb-1 font-semibold">
               <Leaf size={10} /> Harbor Mood
             </div>
-            <p className="text-xs font-bold flex items-center gap-1 text-foreground">
+            <p className="text-xs font-bold flex items-center gap-1 text-card-foreground">
               {route.status === "delayed" && <AlertTriangle size={10} className="text-destructive" />}
               {route.status === "active" && (
                 <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: route.color }} />
@@ -80,7 +80,7 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
             <div className="flex items-center gap-1 text-muted-foreground text-[10px] uppercase tracking-wider mb-1 font-semibold">
               <Clock size={10} /> Harbor Hours
             </div>
-            <p className="text-foreground text-xs font-bold">{route.operatingHours}</p>
+            <p className="text-card-foreground text-xs font-bold">{route.operatingHours}</p>
           </div>
         </div>
 
@@ -96,10 +96,10 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
                 className="flex items-center justify-between text-xs py-1.5 px-3 rounded-xl hover:bg-muted/55 transition-colors font-medium"
                 style={{ animationDelay: `${i * 60}ms`, animation: "float-up 0.4s ease-out forwards", opacity: 0 }}
               >
-                <span className="text-foreground font-bold">{time}</span>
+                <span className="text-card-foreground font-bold">{time}</span>
                 <span className="text-muted-foreground">
                   {i === 0 ? (
-                    <span className="font-bold text-foreground inline-flex items-center gap-1">
+                    <span className="font-bold text-card-foreground inline-flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: route.color }} />
                       Boarding now
                     </span>

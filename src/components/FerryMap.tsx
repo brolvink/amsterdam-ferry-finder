@@ -6,11 +6,13 @@ import {
   ferryDocks,
   getSimulatedPositions,
   type FerryPosition,
+  type FerryDock,
   type FerryRoute,
 } from "@/data/ferries";
 
 interface FerryMapProps {
   onSelectRoute: (route: FerryRoute | null) => void;
+  onSelectDock: (dock: FerryDock | null) => void;
   selectedRouteId: string | null;
   isNight: boolean;
 }
@@ -25,11 +27,24 @@ const BASE_ICON_WIDTH = 92;
 const BASE_ICON_HEIGHT = 58;
 const MIN_ICON_WIDTH = 50;
 const MIN_ICON_HEIGHT = 32;
+const BASE_DOCK_ICON_SIZE = 48;
+const BASE_SHORT_LINE_STOP_ICON_SIZE = 52;
+const BASE_LANDMARK_ICON_SIZE = 72;
+const BASE_CENTRAL_EAST_ICON_SIZE = 72;
+const MIN_DOCK_ICON_SIZE = 32;
+const MIN_SHORT_LINE_STOP_ICON_SIZE = 36;
+const MIN_LANDMARK_ICON_SIZE = 42;
+const MIN_CENTRAL_EAST_ICON_SIZE = 42;
 const FERRY_ICON_URL = `${import.meta.env.BASE_URL}ferry-indicator.png`;
 const AZARTPLEIN_ICON_URL = `${import.meta.env.BASE_URL}azartplein-indicator.png`;
+const CS_DOCK_ICON_URL = `${import.meta.env.BASE_URL}cs-indicator.png`;
+const NACO_HUISJE_ICON_URL = `${import.meta.env.BASE_URL}naco-huisje.png`;
 const SHORT_LINE_STOP_IDS = new Set(["azartplein", "zamenhof"]);
+const CENTRAL_EAST_DOCK_ID = "cs-east";
 const DAY_TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 const NIGHT_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const ZOOM_SCALE_FACTOR = 1.35;
+const MAX_ICON_SCALE = 3.25;
 
 const LANDMARKS = [
   {
@@ -62,10 +77,22 @@ interface FerryIconSize {
   anchorY: number;
 }
 
-function getFerryIconSizeForZoom(zoom: number): FerryIconSize {
+interface MarkerIconSize {
+  size: number;
+  half: number;
+}
+
+function getFerryIconVisualKey(color: string, isDocked: boolean, size: FerryIconSize): string {
+  return `${color}|${isDocked ? "1" : "0"}|${size.width}x${size.height}`;
+}
+
+function getFerryIconSizeForZoom(zoom: number, baseZoom: number): FerryIconSize {
   // Scale icons with zoom: bigger when zooming in, smaller when zooming out.
-  const zoomDelta = zoom - BASE_ZOOM_LEVEL;
-  const scale = Math.max(MIN_ICON_WIDTH / BASE_ICON_WIDTH, Math.pow(1.18, zoomDelta));
+  const zoomDelta = zoom - baseZoom;
+  const scale = Math.min(
+    MAX_ICON_SCALE,
+    Math.max(MIN_ICON_WIDTH / BASE_ICON_WIDTH, Math.pow(ZOOM_SCALE_FACTOR, zoomDelta))
+  );
   const width = Math.max(MIN_ICON_WIDTH, Math.round(BASE_ICON_WIDTH * scale));
   const height = Math.max(MIN_ICON_HEIGHT, Math.round(BASE_ICON_HEIGHT * scale));
 
@@ -75,6 +102,37 @@ function getFerryIconSizeForZoom(zoom: number): FerryIconSize {
     anchorX: Math.round(width / 2),
     anchorY: Math.round(height / 2),
   };
+}
+
+function getMarkerIconSizeForZoom(
+  zoom: number,
+  baseZoom: number,
+  baseSize: number,
+  minSize: number
+): MarkerIconSize {
+  const zoomDelta = zoom - baseZoom;
+  const scale = Math.min(
+    MAX_ICON_SCALE,
+    Math.max(minSize / baseSize, Math.pow(ZOOM_SCALE_FACTOR, zoomDelta))
+  );
+  const size = Math.max(minSize, Math.round(baseSize * scale));
+
+  return {
+    size,
+    half: Math.round(size / 2),
+  };
+}
+
+function getFerryTooltipOffset(size: FerryIconSize): [number, number] {
+  return [0, -Math.round(size.height / 2 + 5)];
+}
+
+function getDockTooltipOffset(size: number): [number, number] {
+  return [0, -Math.round(size / 2 + 5)];
+}
+
+function getLandmarkTooltipOffset(size: number): [number, number] {
+  return [0, -Math.round(size + 5)];
 }
 
 function createFerryIcon(color: string, isDocked: boolean, size: FerryIconSize) {
@@ -121,58 +179,122 @@ function createFerryIcon(color: string, isDocked: boolean, size: FerryIconSize) 
   });
 }
 
-function createDockIcon(dockId: string) {
-  if (SHORT_LINE_STOP_IDS.has(dockId)) {
+function createDockIcon(dockId: string, zoom: number, baseZoom: number) {
+  if (dockId === CENTRAL_EAST_DOCK_ID) {
+    const { size, half } = getMarkerIconSizeForZoom(
+      zoom,
+      baseZoom,
+      BASE_CENTRAL_EAST_ICON_SIZE,
+      MIN_CENTRAL_EAST_ICON_SIZE
+    );
+
     return L.icon({
-      iconUrl: AZARTPLEIN_ICON_URL,
-      iconSize: [58, 58],
-      iconAnchor: [29, 29],
-      popupAnchor: [0, -29],
-      tooltipAnchor: [0, -27],
+      iconUrl: NACO_HUISJE_ICON_URL,
+      iconSize: [size, size],
+      iconAnchor: [half, half],
+      popupAnchor: [0, -half],
+      tooltipAnchor: [0, -(half - 2)],
       className: "dock-marker-img",
     });
   }
 
-  return L.divIcon({
-    className: "dock-marker",
-    html: `<div style="
-      width: 24px;
-      height: 24px;
-      background: hsl(38 68% 62%);
-      border: 2.5px solid hsl(30 30% 30%);
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    "><span style="transform: rotate(45deg); font-size: 10px;">📍</span></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 24],
+  if (SHORT_LINE_STOP_IDS.has(dockId)) {
+    const { size, half } = getMarkerIconSizeForZoom(
+      zoom,
+      baseZoom,
+      BASE_SHORT_LINE_STOP_ICON_SIZE,
+      MIN_SHORT_LINE_STOP_ICON_SIZE
+    );
+
+    return L.icon({
+      iconUrl: AZARTPLEIN_ICON_URL,
+      iconSize: [size, size],
+      iconAnchor: [half, half],
+      popupAnchor: [0, -half],
+      tooltipAnchor: [0, -(half - 2)],
+      className: "dock-marker-img",
+    });
+  }
+
+  const { size, half } = getMarkerIconSizeForZoom(
+    zoom,
+    baseZoom,
+    BASE_DOCK_ICON_SIZE,
+    MIN_DOCK_ICON_SIZE
+  );
+
+  return L.icon({
+    iconUrl: CS_DOCK_ICON_URL,
+    iconSize: [size, size],
+    iconAnchor: [half, half],
+    popupAnchor: [0, -half],
+    tooltipAnchor: [0, -(half - 2)],
+    className: "dock-marker-img",
   });
 }
 
-function createLandmarkIcon(image: string) {
+function getDockMarkerSize(
+  dockId: string,
+  zoom: number,
+  baseZoom: number
+): number {
+  if (dockId === CENTRAL_EAST_DOCK_ID) {
+    return getMarkerIconSizeForZoom(
+      zoom,
+      baseZoom,
+      BASE_CENTRAL_EAST_ICON_SIZE,
+      MIN_CENTRAL_EAST_ICON_SIZE
+    ).size;
+  }
+
+  if (SHORT_LINE_STOP_IDS.has(dockId)) {
+    return getMarkerIconSizeForZoom(
+      zoom,
+      baseZoom,
+      BASE_SHORT_LINE_STOP_ICON_SIZE,
+      MIN_SHORT_LINE_STOP_ICON_SIZE
+    ).size;
+  }
+
+  return getMarkerIconSizeForZoom(
+    zoom,
+    baseZoom,
+    BASE_DOCK_ICON_SIZE,
+    MIN_DOCK_ICON_SIZE
+  ).size;
+}
+
+function createLandmarkIcon(image: string, zoom: number, baseZoom: number) {
+  const { size } = getMarkerIconSizeForZoom(
+    zoom,
+    baseZoom,
+    BASE_LANDMARK_ICON_SIZE,
+    MIN_LANDMARK_ICON_SIZE
+  );
+
   return L.icon({
     iconUrl: `${import.meta.env.BASE_URL}${image}`,
-    iconSize: [72, 72],
-    iconAnchor: [36, 72],
-    popupAnchor: [0, -72],
-    tooltipAnchor: [0, -72],
+    iconSize: [size, size],
+    iconAnchor: [Math.round(size / 2), size],
+    popupAnchor: [0, -size],
+    tooltipAnchor: [0, -size],
     className: "landmark-marker-img",
   });
 }
 
-export default function FerryMap({ onSelectRoute, selectedRouteId, isNight }: FerryMapProps) {
+export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId, isNight }: FerryMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const ferryMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const ferryMarkerVisualKeysRef = useRef<Map<string, string>>(new Map());
+  const dockMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const landmarkMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const iconScaleBaseZoomRef = useRef(BASE_ZOOM_LEVEL);
   const routeLinesRef = useRef<L.Polyline[]>([]);
   const [positions, setPositions] = useState<FerryPosition[]>([]);
-  const [zoomLevel, setZoomLevel] = useState(BASE_ZOOM_LEVEL);
   const [ferryIconSize, setFerryIconSize] = useState<FerryIconSize>(() =>
-    getFerryIconSizeForZoom(BASE_ZOOM_LEVEL)
+    getFerryIconSizeForZoom(BASE_ZOOM_LEVEL, BASE_ZOOM_LEVEL)
   );
 
   useEffect(() => {
@@ -199,23 +321,45 @@ export default function FerryMap({ onSelectRoute, selectedRouteId, isNight }: Fe
     map.fitBounds(AMSTERDAM_BOUNDS);
     map.setMinZoom(map.getBoundsZoom(AMSTERDAM_BOUNDS, true));
     map.setMaxBounds(AMSTERDAM_BOUNDS);
+    iconScaleBaseZoomRef.current = map.getZoom();
 
     ferryDocks.forEach((dock) => {
-      const marker = L.marker([dock.lat, dock.lng], { icon: createDockIcon(dock.id) }).addTo(map);
+      const marker = L.marker([dock.lat, dock.lng], {
+        icon: createDockIcon(dock.id, map.getZoom(), iconScaleBaseZoomRef.current),
+      }).addTo(map);
+      const currentSize = getDockMarkerSize(
+        dock.id,
+        map.getZoom(),
+        iconScaleBaseZoomRef.current
+      );
+
       marker.bindTooltip(dock.name, {
         direction: "top",
-        offset: SHORT_LINE_STOP_IDS.has(dock.id) ? [0, -31] : [0, -26],
+        offset: getDockTooltipOffset(currentSize),
       });
+      marker.on("click", () => onSelectDock(dock));
+      dockMarkersRef.current.set(dock.id, marker);
     });
 
     LANDMARKS.forEach((landmark) => {
       const marker = L.marker([landmark.lat, landmark.lng], {
-        icon: createLandmarkIcon(landmark.image),
+        icon: createLandmarkIcon(landmark.image, map.getZoom(), iconScaleBaseZoomRef.current),
       }).addTo(map);
+      const landmarkIconSize = getMarkerIconSizeForZoom(map.getZoom(), iconScaleBaseZoomRef.current, BASE_LANDMARK_ICON_SIZE, MIN_LANDMARK_ICON_SIZE);
       marker.bindTooltip(landmark.name, {
         direction: "top",
-        offset: [0, -66],
+        offset: getLandmarkTooltipOffset(landmarkIconSize.size),
       });
+      marker.on("click", () => {
+        L.popup()
+          .setLatLng([landmark.lat, landmark.lng])
+          .setContent(`<div style="font-family: 'Quicksand', sans-serif; font-size: 13px; font-weight: 600; padding: 4px;">
+            <strong style="color: #1a1a1a;">${landmark.name}</strong><br/>
+            <span style="color: #666;">Beautiful harbor landmark</span>
+          </div>`)
+          .openOn(map);
+      });
+      landmarkMarkersRef.current.set(landmark.id, marker);
     });
 
     ferryRoutes.forEach((route) => {
@@ -239,22 +383,66 @@ export default function FerryMap({ onSelectRoute, selectedRouteId, isNight }: Fe
 
     const syncIconSize = () => {
       const currentZoom = map.getZoom();
-      setFerryIconSize(getFerryIconSizeForZoom(currentZoom));
-      setZoomLevel(currentZoom);
+      setFerryIconSize(getFerryIconSizeForZoom(currentZoom, iconScaleBaseZoomRef.current));
+
+      ferryDocks.forEach((dock) => {
+        const marker = dockMarkersRef.current.get(dock.id);
+        if (marker) {
+          const currentSize = getDockMarkerSize(
+            dock.id,
+            currentZoom,
+            iconScaleBaseZoomRef.current
+          );
+
+          marker.setIcon(createDockIcon(dock.id, currentZoom, iconScaleBaseZoomRef.current));
+          const tooltip = marker.getTooltip();
+          if (tooltip) {
+            tooltip.options.offset = getDockTooltipOffset(currentSize);
+          }
+        }
+      });
+
+      LANDMARKS.forEach((landmark) => {
+        const marker = landmarkMarkersRef.current.get(landmark.id);
+        if (marker) {
+          const landmarkIconSize = getMarkerIconSizeForZoom(currentZoom, iconScaleBaseZoomRef.current, BASE_LANDMARK_ICON_SIZE, MIN_LANDMARK_ICON_SIZE);
+          marker.setIcon(createLandmarkIcon(landmark.image, currentZoom, iconScaleBaseZoomRef.current));
+          const tooltip = marker.getTooltip();
+          if (tooltip) {
+            tooltip.options.offset = getLandmarkTooltipOffset(landmarkIconSize.size);
+          }
+        }
+      });
+    };
+    let zoomSyncAnimationFrame: number | null = null;
+    const syncIconSizeOnAnimationFrame = () => {
+      if (zoomSyncAnimationFrame !== null) return;
+      zoomSyncAnimationFrame = window.requestAnimationFrame(() => {
+        zoomSyncAnimationFrame = null;
+        syncIconSize();
+      });
     };
     syncIconSize();
+    map.on("zoom", syncIconSizeOnAnimationFrame);
     map.on("zoomend", syncIconSize);
 
     mapInstanceRef.current = map;
 
     return () => {
+      map.off("zoom", syncIconSizeOnAnimationFrame);
       map.off("zoomend", syncIconSize);
+      if (zoomSyncAnimationFrame !== null) {
+        window.cancelAnimationFrame(zoomSyncAnimationFrame);
+      }
       map.remove();
       mapInstanceRef.current = null;
       tileLayerRef.current = null;
       markerStore.clear();
+      ferryMarkerVisualKeysRef.current.clear();
+      dockMarkersRef.current.clear();
+      landmarkMarkersRef.current.clear();
     };
-  }, [isNight, onSelectRoute]);
+  }, [onSelectDock, onSelectRoute]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -294,10 +482,19 @@ export default function FerryMap({ onSelectRoute, selectedRouteId, isNight }: Fe
         ${position.isDocked ? `At dock: ${position.direction === "outbound" ? route.docks[1].name : route.docks[0].name}` : `Sailing to ${tooltipDirection}`}<br/>
         ⏱ ${position.isDocked ? "At dock" : `Arrives in ${position.eta} min`} · ${position.speed.toFixed(1)} kn
       </div>`;
+      const nextVisualKey = getFerryIconVisualKey(route.color, position.isDocked, ferryIconSize);
 
       if (existingMarker) {
         existingMarker.setLatLng([position.lat, position.lng]);
-        existingMarker.setIcon(createFerryIcon(route.color, position.isDocked, ferryIconSize));
+        const currentVisualKey = ferryMarkerVisualKeysRef.current.get(position.id);
+        if (currentVisualKey !== nextVisualKey) {
+          existingMarker.setIcon(createFerryIcon(route.color, position.isDocked, ferryIconSize));
+          const tooltip = existingMarker.getTooltip();
+          if (tooltip) {
+            tooltip.options.offset = getFerryTooltipOffset(ferryIconSize);
+          }
+          ferryMarkerVisualKeysRef.current.set(position.id, nextVisualKey);
+        }
         existingMarker.setTooltipContent(tooltipContent);
         return;
       }
@@ -308,18 +505,20 @@ export default function FerryMap({ onSelectRoute, selectedRouteId, isNight }: Fe
 
       marker.bindTooltip(tooltipContent, {
         direction: "top",
-        offset: [0, -30],
+        offset: getFerryTooltipOffset(ferryIconSize),
         opacity: 0.95,
       });
 
       marker.on("click", () => onSelectRoute(route));
       ferryMarkersRef.current.set(position.id, marker);
+      ferryMarkerVisualKeysRef.current.set(position.id, nextVisualKey);
     });
 
     ferryMarkersRef.current.forEach((marker, markerId) => {
       if (activeIds.has(markerId)) return;
       marker.remove();
       ferryMarkersRef.current.delete(markerId);
+      ferryMarkerVisualKeysRef.current.delete(markerId);
     });
   }, [ferryIconSize, onSelectRoute, positions]);
 

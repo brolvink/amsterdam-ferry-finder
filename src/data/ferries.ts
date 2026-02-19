@@ -43,8 +43,7 @@ export interface FerryPosition {
   dockId: string | null;
 }
 
-const DOCK_STOP_MINUTES = 0;
-const SIMULATION_TIME_SCALE = 12;
+const SIMULATION_TIME_SCALE = 1;
 
 const routeWaypoints: Record<string, [number, number][]> = {
   f1: [
@@ -77,7 +76,7 @@ const routeWaypoints: Record<string, [number, number][]> = {
 export const ferryDocks: FerryDock[] = [
   { id: "cs-ndsm", name: "Centraal Station", lat: 52.38084352843545, lng: 4.89917802825759 },
   { id: "cs-buik", name: "Centraal Station", lat: 52.3807188117236, lng: 4.899427901507475 },
-  { id: "cs-east", name: "Centraal Station (East)", lat: 52.37849693865851, lng: 4.90558612881542 },
+  { id: "cs-east", name: "Centraal Station (East)", lat: 52.3784191027723, lng: 4.9055495479905 },
   { id: "buik", name: "Buiksloterweg", lat: 52.382235464529835, lng: 4.903109850398619 },
   { id: "ndsm", name: "NDSM", lat: 52.4013290166148, lng: 4.890924271312947 },
   { id: "pontsteiger", name: "Pontsteiger", lat: 52.39267111816572, lng: 4.886411014175174 },
@@ -130,7 +129,7 @@ const baseRoutes: BaseRouteDef[] = [
     dockIds: ["cs-ndsm", "ndsm"],
     color: "#E91E63",
     defaults: {
-      frequency: "Every 10-30 min",
+      frequency: "Every 10 min",
       duration: 14,
       operatingHours: "07:00 - 02:00",
       status: "active",
@@ -145,7 +144,7 @@ const baseRoutes: BaseRouteDef[] = [
     defaults: {
       frequency: "Every 15 min",
       duration: 6,
-      operatingHours: "06:30 - 19:30 (Mon-Fri)",
+      operatingHours: "06:30 - 22:30 (Mon-Fri)",
       status: "active",
     },
   },
@@ -286,6 +285,7 @@ function interpolateAlongPath(path: GeoPoint[], progress: number): { lat: number
 }
 
 function parseFrequencyMinutes(frequency: string): number {
+  // Take the lower bound for ranges like "10-30 min"
   return parseInt(frequency.match(/\d+/)?.[0] ?? "10", 10);
 }
 
@@ -293,52 +293,100 @@ export function getScheduleMeta(): FerryScheduleMeta {
   return ferryScheduleData.meta;
 }
 
-// Simulate ferry positions with a dock stop at each end of the route.
+function isRouteOperating(route: FerryRoute, now: Date): boolean {
+  if (route.operatingHours === "24/7") return true;
+
+  // Check day of week for (Mon-Fri)
+  const dayMatch = route.operatingHours.match(/\((.*?)\)/);
+  if (dayMatch) {
+    const dayLimit = dayMatch[1];
+    const day = now.getDay(); // 0 is Sunday, 1-5 is Mon-Fri
+    if (dayLimit === "Mon-Fri" && (day === 0 || day === 6)) return false;
+  }
+
+  // Check HH:mm - HH:mm
+  const match = route.operatingHours.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
+  if (!match) return true;
+
+  const [_, startStr, endStr] = match;
+  const currentTimeStr = now.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+
+  if (startStr <= endStr) {
+    return currentTimeStr >= startStr && currentTimeStr < endStr;
+  } else {
+    // Over midnight e.g. 07:00 - 02:00
+    return currentTimeStr >= startStr || currentTimeStr < endStr;
+  }
+}
+
+// Simulate ferry positions following the real-world schedule.
+// Ferries depart from Dock A on every 'frequency' minute (e.g., 20:00, 20:05).
+// They arrive at Dock B 'duration' minutes later, wait for a gap, 
+// then return to Dock A in time for a later departure slot.
 export function getSimulatedPositions(): FerryPosition[] {
   const now = Date.now() * SIMULATION_TIME_SCALE;
+  const wallNow = new Date(now);
+  const wallClockMinutes = now / (60 * 1000);
 
   return ferryRoutes
-    .filter((route) => route.status !== "offline")
+    .filter((route) => route.status !== "offline" && isRouteOperating(route, wallNow))
     .flatMap((route) => {
       const [dockA, dockB] = route.docks;
+      const frequency = parseFrequencyMinutes(route.frequency);
+      const sailingDuration = route.duration;
+
+      // Calculate how many ferries are needed to sustain this frequency.
+      // We need enough ferries so that a round trip (2*duration + 2*dockTime) 
+      // fits into the combined schedule slots.
+      // Min dock time is 1 min as per user requirement.
+      const roundTripMin = 2 * (sailingDuration + 1);
+      const numFerries = Math.ceil(roundTripMin / frequency);
+      const cycleMinutes = numFerries * frequency;
+      const legDuration = cycleMinutes / 2; // Time between departing A and departing B
+
       const outboundPath = route.path;
       const inboundPath = [...route.path].reverse();
-
-      const travelMs = route.duration * 60 * 1000;
-      const dockMs = DOCK_STOP_MINUTES * 60 * 1000;
-      const cycleMs = travelMs * 2 + dockMs * 2;
       const routeLengthMeters = getPathMetrics(outboundPath).totalLength;
-      const averageSpeedKnots = route.duration > 0 ? (routeLengthMeters / 1852) / (route.duration / 60) : 0;
+      const averageSpeedKnots = sailingDuration > 0 ? (routeLengthMeters / 1852) / (sailingDuration / 60) : 0;
 
-      const buildFerry = (index: number, offsetMs: number): FerryPosition => {
-        const phase = (now + offsetMs) % cycleMs;
+      const ferries: FerryPosition[] = [];
+      for (let i = 0; i < numFerries; i++) {
+        // Each ferry is offset by some multiple of 'frequency'
+        const ferryOffset = i * frequency;
 
-        if (phase < travelMs) {
-          const legProgress = phase / travelMs;
-          const point = interpolateAlongPath(outboundPath, legProgress);
-          return {
-            id: `${route.id}-${index + 1}`,
+        // Time in the ferry's own cycle (0 to cycleMinutes)
+        // We sync to the wall clock so departure from A happens at t % cycleMinutes == 0 (for ferry 0)
+        let ferryTime = (wallClockMinutes - ferryOffset) % cycleMinutes;
+        if (ferryTime < 0) ferryTime += cycleMinutes;
+
+        let pos: FerryPosition;
+
+        if (ferryTime < sailingDuration) {
+          // Leg 1: Sailing A -> B
+          const progress = ferryTime / sailingDuration;
+          const point = interpolateAlongPath(outboundPath, progress);
+          pos = {
+            id: `${route.id}-${i + 1}`,
             routeId: route.id,
             lat: point.lat,
             lng: point.lng,
             heading: point.heading,
-            progress: legProgress,
+            progress,
             direction: "outbound",
-            speed: averageSpeedKnots + Math.sin(now / 4500 + index) * 0.7,
-            eta: Math.max(1, Math.round((travelMs - phase) / 60000)),
+            speed: averageSpeedKnots,
+            eta: Math.max(1, Math.round(sailingDuration - ferryTime)),
             isDocked: false,
             dockId: null,
           };
-        }
-
-        if (phase < travelMs + dockMs) {
-          const outboundHeading = bearingDegrees(outboundPath[outboundPath.length - 1], outboundPath[outboundPath.length - 2]);
-          return {
-            id: `${route.id}-${index + 1}`,
+        } else if (ferryTime < legDuration) {
+          // Docked at B
+          const heading = bearingDegrees(outboundPath[outboundPath.length - 2], outboundPath[outboundPath.length - 1]);
+          pos = {
+            id: `${route.id}-${i + 1}`,
             routeId: route.id,
             lat: dockB.lat,
             lng: dockB.lng,
-            heading: outboundHeading,
+            heading: heading,
             progress: 1,
             direction: "outbound",
             speed: 0,
@@ -346,65 +394,81 @@ export function getSimulatedPositions(): FerryPosition[] {
             isDocked: true,
             dockId: dockB.id,
           };
-        }
-
-        if (phase < travelMs * 2 + dockMs) {
-          const inboundPhase = phase - travelMs - dockMs;
-          const legProgress = inboundPhase / travelMs;
+        } else if (ferryTime < legDuration + sailingDuration) {
+          // Leg 2: Sailing B -> A
+          const legProgress = (ferryTime - legDuration) / sailingDuration;
           const point = interpolateAlongPath(inboundPath, legProgress);
-          return {
-            id: `${route.id}-${index + 1}`,
+          pos = {
+            id: `${route.id}-${i + 1}`,
             routeId: route.id,
             lat: point.lat,
             lng: point.lng,
             heading: point.heading,
             progress: legProgress,
             direction: "inbound",
-            speed: averageSpeedKnots + Math.sin(now / 4500 + index + 1) * 0.7,
-            eta: Math.max(1, Math.round((travelMs - inboundPhase) / 60000)),
+            speed: averageSpeedKnots,
+            eta: Math.max(1, Math.round(sailingDuration - (ferryTime - legDuration))),
             isDocked: false,
             dockId: null,
           };
+        } else {
+          // Docked at A
+          const heading = bearingDegrees(inboundPath[inboundPath.length - 2], inboundPath[inboundPath.length - 1]);
+          pos = {
+            id: `${route.id}-${i + 1}`,
+            routeId: route.id,
+            lat: dockA.lat,
+            lng: dockA.lng,
+            heading: heading,
+            progress: 1,
+            direction: "inbound",
+            speed: 0,
+            eta: 0,
+            isDocked: true,
+            dockId: dockA.id,
+          };
         }
-
-        const inboundHeading = bearingDegrees(inboundPath[inboundPath.length - 1], inboundPath[inboundPath.length - 2]);
-        return {
-          id: `${route.id}-${index + 1}`,
-          routeId: route.id,
-          lat: dockA.lat,
-          lng: dockA.lng,
-          heading: inboundHeading,
-          progress: 1,
-          direction: "inbound",
-          speed: 0,
-          eta: 0,
-          isDocked: true,
-          dockId: dockA.id,
-        };
-      };
-
-      return [buildFerry(0, 0), buildFerry(1, cycleMs / 2)];
+        ferries.push(pos);
+      }
+      return ferries;
     });
 }
 
 export function getNextDepartures(routeId: string): string[] {
-  const now = new Date();
-  const departures: string[] = [];
   const route = ferryRoutes.find((r) => r.id === routeId);
   if (!route) return [];
 
-  const frequencyMinutes = parseFrequencyMinutes(route.frequency);
-  const currentMinutes = now.getMinutes();
-  const nextSlot = Math.ceil(currentMinutes / frequencyMinutes) * frequencyMinutes;
+  return getNextDeparturesFromDock(routeId, route.docks[0].id);
+}
 
-  for (let i = 0; i < 5; i++) {
-    const departure = new Date(now);
-    departure.setMinutes(nextSlot + i * frequencyMinutes);
-    departure.setSeconds(0);
+export function getNextDeparturesFromDock(routeId: string, dockId: string, count = 5): string[] {
+  const route = ferryRoutes.find((r) => r.id === routeId);
+  if (!route) return [];
+  if (!route.docks.some((dock) => dock.id === dockId)) return [];
+
+  const frequencyMinutes = parseFrequencyMinutes(route.frequency);
+  const frequencyMs = frequencyMinutes * 60 * 1000;
+  const nowMs = Date.now();
+  const offsetMs = getDockDepartureOffsetMinutes(route, dockId) * 60 * 1000;
+  const cycleIndex = Math.floor((nowMs - offsetMs) / frequencyMs);
+  const nextBaseMs = offsetMs + (cycleIndex + 1) * frequencyMs;
+
+  const departures: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const departure = new Date(nextBaseMs + i * frequencyMs);
     departures.push(
       departure.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })
     );
   }
 
   return departures;
+}
+
+function getDockDepartureOffsetMinutes(route: FerryRoute, dockId: string): number {
+  if (route.docks[0].id === dockId) return 0;
+
+  const frequency = parseFrequencyMinutes(route.frequency);
+  const roundTripMinutes = 2 * (route.duration + 1);
+  const ferryCount = Math.ceil(roundTripMinutes / frequency);
+  return (ferryCount * frequency) / 2;
 }

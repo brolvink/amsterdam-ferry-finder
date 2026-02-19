@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { Moon, Ship, Sun, Leaf, MapPin, Wind } from "lucide-react";
-import { ferryRoutes, getSimulatedPositions } from "@/data/ferries";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Moon, Sun, Leaf, Wind, Pencil, Check, X } from "lucide-react";
+import { ferryRoutes } from "@/data/ferries";
 import type { FerryRoute } from "@/data/ferries";
 import { useAmsterdamWeather } from "@/hooks/useAmsterdamWeather";
+import LofiPlayer from "@/components/LofiPlayer";
 
 interface HudOverlayProps {
   onSelectRoute: (route: FerryRoute) => void;
@@ -22,7 +23,11 @@ export default function HudOverlay({
   onSetThemeMode,
 }: HudOverlayProps) {
   const [time, setTime] = useState(new Date());
-  const [activeCount, setActiveCount] = useState(0);
+  const [harborName, setHarborName] = useState("Ferry Island");
+  const [isEditingHarborName, setIsEditingHarborName] = useState(false);
+  const [draftHarborName, setDraftHarborName] = useState("");
+  const [wobbleRouteId, setWobbleRouteId] = useState<string | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const {
     data: weather,
     isLoading: weatherLoading,
@@ -32,9 +37,16 @@ export default function HudOverlay({
   useEffect(() => {
     const t = setInterval(() => {
       setTime(new Date());
-      setActiveCount(getSimulatedPositions().length);
     }, 1000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("ferrynice-harbor-name");
+    if (stored && stored.trim()) {
+      setHarborName(stored.trim());
+    }
   }, []);
 
   const timeStr = time.toLocaleTimeString("nl-NL", {
@@ -55,6 +67,86 @@ export default function HudOverlay({
         ? "Crisp Morning"
         : "Island Time"
     : "Island Time";
+  const mascotMessage = useMemo(() => {
+    if (!weather) return "Scout Gull says: mellow tides and smooth routes.";
+    if (!weather.isDay) {
+      return weather.temperatureC <= 7
+        ? "Scout Gull says: bundle up, it is crisp on deck."
+        : "Scout Gull says: calm night crossings ahead.";
+    }
+    if (weather.code >= 51 && weather.code <= 99) {
+      return "Scout Gull says: drizzle watch, mind slippery docks.";
+    }
+    if (weather.windSpeedKmh >= 22) {
+      return "Scout Gull says: breezy sails, hold your cap tight.";
+    }
+    return "Scout Gull says: golden weather for harbor hopping.";
+  }, [weather]);
+
+  const playRouteClickSound = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    const context = audioCtxRef.current ?? new AudioContextCtor();
+    audioCtxRef.current = context;
+
+    const now = context.currentTime;
+    const oscA = context.createOscillator();
+    const oscB = context.createOscillator();
+    const gain = context.createGain();
+
+    oscA.type = "triangle";
+    oscB.type = "sine";
+    oscA.frequency.setValueAtTime(510, now);
+    oscA.frequency.exponentialRampToValueAtTime(690, now + 0.07);
+    oscB.frequency.setValueAtTime(760, now);
+    oscB.frequency.exponentialRampToValueAtTime(420, now + 0.09);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.05, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+    oscA.connect(gain);
+    oscB.connect(gain);
+    gain.connect(context.destination);
+
+    oscA.start(now);
+    oscB.start(now);
+    oscA.stop(now + 0.13);
+    oscB.stop(now + 0.13);
+  }, []);
+
+  const handleRouteClick = useCallback((route: FerryRoute) => {
+    setWobbleRouteId(route.id);
+    window.setTimeout(() => setWobbleRouteId((current) => (current === route.id ? null : current)), 320);
+    playRouteClickSound();
+    onSelectRoute(route);
+  }, [onSelectRoute, playRouteClickSound]);
+
+  const handleStartEditingHarborName = useCallback(() => {
+    setDraftHarborName(harborName);
+    setIsEditingHarborName(true);
+  }, [harborName]);
+
+  const handleCancelEditingHarborName = useCallback(() => {
+    setDraftHarborName("");
+    setIsEditingHarborName(false);
+  }, []);
+
+  const handleSaveHarborName = useCallback(() => {
+    const trimmed = draftHarborName.trim();
+    if (!trimmed) {
+      handleCancelEditingHarborName();
+      return;
+    }
+    const nextName = trimmed.slice(0, 32);
+    setHarborName(nextName);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("ferrynice-harbor-name", nextName);
+    }
+    setIsEditingHarborName(false);
+  }, [draftHarborName, handleCancelEditingHarborName]);
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[1000] flex flex-col p-3 md:p-4">
@@ -92,20 +184,76 @@ export default function HudOverlay({
               >
                 {isNight ? <Sun size={14} /> : <Moon size={14} />}
               </button>
+              <LofiPlayer />
             </div>
           </div>
-          <p className="text-amber-100/90 text-[10px] tracking-wider mt-0.5 font-semibold">
-            Harbor Life Guidebook
-          </p>
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-amber-100/90 text-[10px] tracking-wider font-semibold">
+              Harbor Life Guidebook
+            </p>
+            <div className="pointer-events-auto flex items-center gap-1.5">
+              {isEditingHarborName ? (
+                <>
+                  <input
+                    value={draftHarborName}
+                    onChange={(event) => setDraftHarborName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") handleSaveHarborName();
+                      if (event.key === "Escape") handleCancelEditingHarborName();
+                    }}
+                    className="h-6 w-28 rounded-md border border-amber-100/35 bg-amber-100/10 px-2 text-[10px] font-semibold tracking-wide text-amber-50 placeholder:text-amber-100/70 outline-none focus:border-amber-100/70"
+                    placeholder="Your harbor name"
+                    maxLength={32}
+                    aria-label="Edit harbor name"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveHarborName}
+                    className="h-6 w-6 rounded-md border border-amber-100/35 bg-amber-100/12 text-amber-50 inline-flex items-center justify-center hover:bg-amber-100/24 transition-colors"
+                    aria-label="Save harbor name"
+                  >
+                    <Check size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEditingHarborName}
+                    className="h-6 w-6 rounded-md border border-amber-100/35 bg-amber-100/12 text-amber-50 inline-flex items-center justify-center hover:bg-amber-100/24 transition-colors"
+                    aria-label="Cancel harbor name editing"
+                  >
+                    <X size={12} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] text-amber-50/90 font-bold tracking-wide truncate max-w-[9rem]">
+                    {harborName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleStartEditingHarborName}
+                    className="h-6 w-6 rounded-md border border-amber-100/35 bg-amber-100/10 text-amber-50 inline-flex items-center justify-center hover:bg-amber-100/24 transition-colors"
+                    aria-label="Rename island"
+                  >
+                    <Pencil size={11} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="mascot-note mt-1.5">
+            <span className="mascot-note__icon" aria-hidden="true">🕊️</span>
+            <p>{mascotMessage}</p>
+          </div>
         </div>
 
         {/* Clock — like a Nook Phone widget */}
-        <div className="pointer-events-auto wood-panel px-3 py-2 text-right">
-          <p className="font-display text-lg md:text-xl font-bold text-foreground">
+        <div className="pointer-events-auto wood-panel-dark-card px-3 py-2 text-right">
+          <p className="font-display text-lg md:text-xl font-bold text-card-foreground">
             {timeStr}
           </p>
           <p className="text-muted-foreground text-[10px] font-semibold">{dateStr}</p>
-          <p className="text-[10px] mt-1 font-semibold text-foreground/90">
+          <p className="text-[10px] mt-1 font-semibold text-card-foreground/90">
             {weatherLoading && "Loading weather..."}
             {weatherError && "Weather unavailable"}
             {weather && `${Math.round(weather.temperatureC)}°C · ${weather.label}`}
@@ -131,8 +279,8 @@ export default function HudOverlay({
           {ferryRoutes.map((route) => (
             <button
               key={route.id}
-              onClick={() => onSelectRoute(route)}
-              className={`inventory-slot ${selectedRouteId === route.id ? "inventory-slot--active" : ""}`}
+              onClick={() => handleRouteClick(route)}
+              className={`inventory-slot ${selectedRouteId === route.id ? "inventory-slot--active" : ""} ${wobbleRouteId === route.id ? "inventory-slot--wobble" : ""}`}
               aria-label={`Open ${route.code} route card`}
             >
               <div
@@ -142,33 +290,20 @@ export default function HudOverlay({
                 }}
               />
               <div className="min-w-0">
-                <span className="text-[11px] font-bold text-foreground block truncate">
+                <span className="text-[11px] font-bold text-amber-100 block truncate">
                   {route.code}
                 </span>
-                <span className="text-[9px] text-foreground/75 block truncate font-semibold">
-                  {route.name}
+                <span className="text-[9px] text-amber-100/80 block truncate font-semibold">
+                  {route.docks[0].name} ↔ {route.docks[1].name}
                 </span>
               </div>
               {route.status === "active" && (
-                <span className="ml-auto text-[8px] text-primary font-bold">●</span>
+                <span className="ml-auto text-[8px] text-amber-200 font-bold">●</span>
               )}
             </button>
           ))}
         </div>
 
-        {/* Stats — like a game status bar */}
-        <div className="pointer-events-auto wood-panel px-3 py-2">
-          <div className="flex items-center gap-3 text-[11px] font-semibold">
-            <span className="flex items-center gap-1 text-primary">
-              <Ship size={12} />
-              {activeCount} sailing
-            </span>
-            <span className="flex items-center gap-1 text-secondary-foreground">
-              <MapPin size={12} className="text-secondary" />
-              {ferryRoutes.filter((r) => r.status === "active").length} harbors
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

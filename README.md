@@ -64,6 +64,21 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
+## Deploy on Hetzner with Culefi/Coolify
+
+This repo now includes a production-ready `Dockerfile` and `nginx.conf` for container deployment.
+
+1. Push the repository to GitHub/GitLab.
+2. In Culefi/Coolify, create a new application from your Git repository.
+3. Select `Dockerfile` as the build method (no custom start command needed).
+4. Set the exposed port to `80` in Culefi/Coolify.
+5. Deploy.
+
+Notes:
+
+- This is a React SPA, and `nginx.conf` includes route fallback (`try_files ... /index.html`) so deep links work.
+- Static assets are served from `dist/` built during image build (`npm ci && npm run build`).
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!

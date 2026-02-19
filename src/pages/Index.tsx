@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
 import FerryMap from "@/components/FerryMap";
 import FerrySchedule from "@/components/FerrySchedule";
+import DockDepartures from "@/components/DockDepartures";
 import HudOverlay from "@/components/HudOverlay";
-import type { FerryRoute } from "@/data/ferries";
+import SeagullCursor from "@/components/SeagullCursor";
+import type { FerryDock, FerryRoute } from "@/data/ferries";
 import { useAmsterdamWeather } from "@/hooks/useAmsterdamWeather";
 import { cn } from "@/lib/utils";
 
@@ -10,11 +12,17 @@ type ThemeMode = "auto" | "day" | "night";
 
 const Index = () => {
   const [selectedRoute, setSelectedRoute] = useState<FerryRoute | null>(null);
+  const [selectedDock, setSelectedDock] = useState<FerryDock | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>("auto");
   const { data: weather } = useAmsterdamWeather();
 
   const handleSelectRoute = useCallback((route: FerryRoute | null) => {
+    setSelectedDock(null);
     setSelectedRoute((prev) => (prev?.id === route?.id ? null : route));
+  }, []);
+  const handleSelectDock = useCallback((dock: FerryDock | null) => {
+    setSelectedRoute(null);
+    setSelectedDock((prev) => (prev?.id === dock?.id ? null : dock));
   }, []);
 
   const currentHour = new Date().getHours();
@@ -46,6 +54,7 @@ const Index = () => {
     >
       <FerryMap
         onSelectRoute={handleSelectRoute}
+        onSelectDock={handleSelectDock}
         selectedRouteId={selectedRoute?.id ?? null}
         isNight={isNight}
       />
@@ -79,9 +88,17 @@ const Index = () => {
         onSetThemeMode={setThemeMode}
       />
 
+      <SeagullCursor />
+
       {selectedRoute && (
-        <div className="absolute top-16 right-3 md:right-4 z-[1001] w-[17.5rem] md:w-80">
+        <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-[1001] w-[17.5rem] md:w-80">
           <FerrySchedule route={selectedRoute} onClose={() => setSelectedRoute(null)} />
+        </div>
+      )}
+
+      {selectedDock && (
+        <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-[1001] w-[17.5rem] md:w-80">
+          <DockDepartures dock={selectedDock} onClose={() => setSelectedDock(null)} />
         </div>
       )}
     </div>
