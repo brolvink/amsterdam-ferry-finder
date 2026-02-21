@@ -1,106 +1,49 @@
-# Welcome to your Lovable project
+# Amsterdam Ferry Finder
 
-## Project info
+Fun side project to explore Amsterdam ferries on an interactive map with route and departure details.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Live: https://ferry.bramrolvink.nl
 
-## How can I edit this code?
+![Amsterdam Ferry Finder screenshot](public/ferry-screenshot.png)
 
-There are several ways of editing your application.
+## Stack
 
-**Use Lovable**
+- React + TypeScript + Vite
+- Tailwind CSS + shadcn/ui
+- Leaflet (map)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Run locally
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Production build
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+npm run build
+npm run preview
+```
 
-**Use GitHub Codespaces**
+## Ferry schedule updates
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Schedule data lives in `src/data/ferryScheduleData.ts`.
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Deploy on Hetzner with Culefi/Coolify
-
-This repo now includes a production-ready `Dockerfile` and `nginx.conf` for container deployment.
-
-1. Push the repository to GitHub/GitLab.
-2. In Culefi/Coolify, create a new application from your Git repository.
-3. Select `Dockerfile` as the build method (no custom start command needed).
-4. Set the exposed port to `80` in Culefi/Coolify.
-5. Deploy.
-
-Notes:
-
-- This is a React SPA, and `nginx.conf` includes route fallback (`try_files ... /index.html`) so deep links work.
-- Static assets are served from `dist/` built during image build (`npm ci && npm run build`).
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
-
-## Ferry schedule auto-refresh
-
-This project now keeps ferry timetable data in `src/data/ferryScheduleData.ts` and ships an updater script:
+To refresh from an external source:
 
 ```sh
 npm run update:ferry-schedules
 ```
 
-The script expects a JSON source endpoint in `FERRY_SCHEDULE_SOURCE_URL` and optionally a bearer token in `FERRY_SCHEDULE_SOURCE_TOKEN`.
+Environment variables used by the updater:
 
-An automated workflow is included at `.github/workflows/ferry-schedule-refresh.yml`:
+- `FERRY_SCHEDULE_SOURCE_URL` (required)
+- `FERRY_SCHEDULE_SOURCE_TOKEN` (optional bearer token)
+- `FERRY_SCHEDULE_REFRESH_CADENCE` (`weekly` or `daily`, optional)
 
-- Runs weekly on Monday at 04:00 UTC.
-- Can be triggered manually from GitHub Actions.
-- Commits updated `src/data/ferryScheduleData.ts` when timetable data changes.
+GitHub Actions workflow: `.github/workflows/ferry-schedule-refresh.yml` (weekly by default).
 
-To switch to daily refresh, change the cron to `0 4 * * *` and set `FERRY_SCHEDULE_REFRESH_CADENCE=daily`.
+## Docker
+
+This repo includes a production-ready `Dockerfile` + `nginx.conf` for serving the built SPA.

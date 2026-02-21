@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, Leaf, Wind, Pencil, Check, X } from "lucide-react";
+import { Moon, Sun, Leaf, Wind } from "lucide-react";
 import { ferryRoutes } from "@/data/ferries";
 import type { FerryRoute } from "@/data/ferries";
 import { useAmsterdamWeather } from "@/hooks/useAmsterdamWeather";
@@ -23,9 +23,6 @@ export default function HudOverlay({
   onSetThemeMode,
 }: HudOverlayProps) {
   const [time, setTime] = useState(new Date());
-  const [harborName, setHarborName] = useState("Ferry Island");
-  const [isEditingHarborName, setIsEditingHarborName] = useState(false);
-  const [draftHarborName, setDraftHarborName] = useState("");
   const [wobbleRouteId, setWobbleRouteId] = useState<string | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const {
@@ -39,14 +36,6 @@ export default function HudOverlay({
       setTime(new Date());
     }, 1000);
     return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("ferrynice-harbor-name");
-    if (stored && stored.trim()) {
-      setHarborName(stored.trim());
-    }
   }, []);
 
   const timeStr = time.toLocaleTimeString("nl-NL", {
@@ -136,40 +125,16 @@ export default function HudOverlay({
     onSelectRoute(route);
   }, [onSelectRoute, playRouteClickSound]);
 
-  const handleStartEditingHarborName = useCallback(() => {
-    setDraftHarborName(harborName);
-    setIsEditingHarborName(true);
-  }, [harborName]);
-
-  const handleCancelEditingHarborName = useCallback(() => {
-    setDraftHarborName("");
-    setIsEditingHarborName(false);
-  }, []);
-
-  const handleSaveHarborName = useCallback(() => {
-    const trimmed = draftHarborName.trim();
-    if (!trimmed) {
-      handleCancelEditingHarborName();
-      return;
-    }
-    const nextName = trimmed.slice(0, 32);
-    setHarborName(nextName);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("ferrynice-harbor-name", nextName);
-    }
-    setIsEditingHarborName(false);
-  }, [draftHarborName, handleCancelEditingHarborName]);
-
   return (
-    <div className="pointer-events-none absolute inset-0 z-[1000] flex flex-col p-3 md:p-4">
+    <div className="pointer-events-none absolute inset-0 z-[1000] flex flex-col p-3 md:p-4 overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-start justify-between mb-auto">
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-3 mb-auto">
         {/* Title — wooden sign style */}
-        <div className="pointer-events-auto wood-panel-dark px-4 py-2.5 md:px-5 md:py-3">
+        <div className="pointer-events-auto wood-panel-dark px-4 py-2.5 md:px-5 md:py-3 w-full sm:w-auto">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-lg inline-flex items-center leading-none">
-                <img src="/ferry-indicator.png" alt="Ferry" className="w-12 h-12" />
+              <span className="text-lg inline-flex items-center leading-none shrink-0">
+                <img src="/ferry-indicator.png" alt="Ferry" className="w-10 h-10 md:w-12 md:h-12" />
               </span>
               <h1 className="font-display text-base md:text-lg font-bold tracking-wide text-amber-100">
                 ferrynice
@@ -179,11 +144,10 @@ export default function HudOverlay({
               <button
                 type="button"
                 onClick={() => onSetThemeMode("auto")}
-                className={`px-2 py-1 rounded-lg text-[10px] font-bold tracking-wide border transition-colors ${
-                  themeMode === "auto"
-                    ? "bg-amber-100/25 text-amber-100 border-amber-100/60"
-                    : "bg-amber-100/8 text-amber-100/80 border-amber-100/30 hover:bg-amber-100/16"
-                }`}
+                className={`h-8 md:h-7 px-2.5 md:px-2 rounded-lg text-[11px] md:text-[10px] font-bold tracking-wide border transition-colors ${themeMode === "auto"
+                  ? "bg-amber-100/25 text-amber-100 border-amber-100/60"
+                  : "bg-amber-100/8 text-amber-100/80 border-amber-100/30 hover:bg-amber-100/16"
+                  }`}
                 aria-label="Use automatic day and night mode"
               >
                 AUTO
@@ -191,77 +155,23 @@ export default function HudOverlay({
               <button
                 type="button"
                 onClick={onToggleTheme}
-                className="h-7 px-2 rounded-lg border border-amber-100/30 bg-amber-100/8 text-amber-100 hover:bg-amber-100/16 transition-colors inline-flex items-center justify-center"
+                className="h-8 w-8 md:h-7 md:w-auto md:px-2 rounded-lg border border-amber-100/30 bg-amber-100/8 text-amber-100 hover:bg-amber-100/16 transition-colors inline-flex items-center justify-center shrink-0"
                 aria-label={isNight ? "Switch to day mode" : "Switch to night mode"}
               >
-                {isNight ? <Sun size={14} /> : <Moon size={14} />}
+                {isNight ? <Sun size={16} className="md:w-[14px] md:h-[14px]" /> : <Moon size={16} className="md:w-[14px] md:h-[14px]" />}
               </button>
               <LofiPlayer />
             </div>
           </div>
-          <div className="flex items-center justify-between gap-2 mt-0.5">
-            <p className="text-amber-100/90 text-[10px] tracking-wider font-semibold">
-              Harbor Life Guidebook
-            </p>
-            <div className="pointer-events-auto flex items-center gap-1.5">
-              {isEditingHarborName ? (
-                <>
-                  <input
-                    value={draftHarborName}
-                    onChange={(event) => setDraftHarborName(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") handleSaveHarborName();
-                      if (event.key === "Escape") handleCancelEditingHarborName();
-                    }}
-                    className="h-6 w-28 rounded-md border border-amber-100/35 bg-amber-100/10 px-2 text-[10px] font-semibold tracking-wide text-amber-50 placeholder:text-amber-100/70 outline-none focus:border-amber-100/70"
-                    placeholder="Your harbor name"
-                    maxLength={32}
-                    aria-label="Edit harbor name"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveHarborName}
-                    className="h-6 w-6 rounded-md border border-amber-100/35 bg-amber-100/12 text-amber-50 inline-flex items-center justify-center hover:bg-amber-100/24 transition-colors"
-                    aria-label="Save harbor name"
-                  >
-                    <Check size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelEditingHarborName}
-                    className="h-6 w-6 rounded-md border border-amber-100/35 bg-amber-100/12 text-amber-50 inline-flex items-center justify-center hover:bg-amber-100/24 transition-colors"
-                    aria-label="Cancel harbor name editing"
-                  >
-                    <X size={12} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="text-[10px] text-amber-50/90 font-bold tracking-wide truncate max-w-[9rem]">
-                    {harborName}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleStartEditingHarborName}
-                    className="h-6 w-6 rounded-md border border-amber-100/35 bg-amber-100/10 text-amber-50 inline-flex items-center justify-center hover:bg-amber-100/24 transition-colors"
-                    aria-label="Rename island"
-                  >
-                    <Pencil size={11} />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="mascot-note mt-1.5">
+          <div className="mascot-note mt-2 md:mt-1.5 w-full">
             <span className="mascot-note__icon" aria-hidden="true">🕊️</span>
-            <p>{mascotMessage}</p>
+            <p className="text-[9px] md:text-[10px]">{mascotMessage}</p>
           </div>
         </div>
 
         {/* Clock — like a Nook Phone widget */}
-        <div className="pointer-events-auto wood-panel-dark-card px-3 py-2 text-right">
-          <p className="font-display text-lg md:text-xl font-bold text-card-foreground">
+        <div className="pointer-events-auto wood-panel-dark-card px-3 py-2 text-right self-end sm:self-auto min-w-[140px]">
+          <p className="font-display text-lg md:text-xl font-bold text-card-foreground leading-none">
             {timeStr}
           </p>
           <p className="text-muted-foreground text-[10px] font-semibold">{dateStr}</p>
@@ -285,38 +195,43 @@ export default function HudOverlay({
       </div>
 
       {/* Bottom bar */}
-      <div className="flex items-end justify-between mt-auto gap-2">
+      <div className="flex items-end justify-between mt-6 md:mt-auto gap-2">
         {/* Route list — like AC inventory slots */}
-        <div className="pointer-events-auto flex flex-col gap-1.5 max-w-[210px]">
-          {sortedFerryRoutes.map((route) => (
-            <button
-              key={route.id}
-              onClick={() => handleRouteClick(route)}
-              className={`inventory-slot ${selectedRouteId === route.id ? "inventory-slot--active" : ""} ${wobbleRouteId === route.id ? "inventory-slot--wobble" : ""}`}
-              aria-label={`Open ${route.code} route card`}
-            >
-              <div
-                className={`w-3 h-3 rounded-full shrink-0 shadow-sm ${selectedRouteId === route.id ? "animate-pulse-glow" : ""}`}
-                style={{
-                  background: route.color,
-                }}
-              />
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold text-amber-100 block truncate">
-                  {route.code}
-                </span>
-                <span className="text-[9px] text-amber-100/80 block truncate font-semibold">
-                  {route.docks[0].name} ↔ {route.docks[1].name}
-                </span>
-              </div>
-              {route.status === "active" && (
-                <span className="ml-auto text-[8px] text-amber-200 font-bold">●</span>
-              )}
-            </button>
-          ))}
+        <div className="pointer-events-auto flex flex-col gap-1.5 w-full md:max-w-[210px]">
+          <p className="text-amber-100/60 text-[9px] font-bold tracking-widest uppercase md:hidden px-1">
+            Active Routes
+          </p>
+          <div className="flex md:flex-col gap-2 md:gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar pb-1 md:pb-0 scroll-smooth px-0.5">
+            {sortedFerryRoutes.map((route) => (
+              <button
+                key={route.id}
+                onClick={() => handleRouteClick(route)}
+                className={`inventory-slot flex-shrink-0 w-[140px] md:w-full ${selectedRouteId === route.id ? "inventory-slot--active" : ""} ${wobbleRouteId === route.id ? "inventory-slot--wobble" : ""}`}
+                aria-label={`Open ${route.code} route card`}
+              >
+                <div
+                  className={`w-3 h-3 rounded-full shrink-0 shadow-sm ${selectedRouteId === route.id ? "animate-pulse-glow" : ""}`}
+                  style={{
+                    background: route.color,
+                  }}
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-bold text-amber-100 block truncate leading-tight">
+                    {route.code}
+                  </span>
+                  <span className="text-[9px] text-amber-100/80 block truncate font-semibold leading-tight">
+                    {route.docks[0].name} ↔ {route.docks[1].name}
+                  </span>
+                </div>
+                {route.status === "active" && (
+                  <span className="ml-auto text-[8px] text-amber-200 font-bold">●</span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
-
       </div>
     </div>
+
   );
 }

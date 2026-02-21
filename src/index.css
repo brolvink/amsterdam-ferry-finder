@@ -149,6 +149,14 @@
     font-family: 'Baloo 2', cursive;
   }
 
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   .wood-panel {
     @apply bg-card border-2 border-border rounded-[1.25rem] relative;
     box-shadow: var(--wood-shadow);

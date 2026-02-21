@@ -11,6 +11,7 @@ export default function SeagullCursor() {
     const [isMovingRight, setIsMovingRight] = useState(false);
     const [frameIndex, setFrameIndex] = useState(0);
     const [framesReady, setFramesReady] = useState(false);
+    const [visible, setVisible] = useState(false);
 
     const prevPosition = useRef({ x: 0, y: 0 });
     const timeoutRef = useRef<number | null>(null);
@@ -69,7 +70,7 @@ export default function SeagullCursor() {
 
             ambient.currentTime = 0;
             ambient.playbackRate = 0.92 + Math.random() * 0.18;
-            void ambient.play().catch(() => {});
+            void ambient.play().catch(() => { });
         };
 
         const scheduleAmbientSeagull = () => {
@@ -139,6 +140,8 @@ export default function SeagullCursor() {
                 if (dx > 1) setIsMovingRight(true);
                 if (dx < -1) setIsMovingRight(false);
 
+                if (!visible) setVisible(true);
+
                 let targetAngle = Math.atan2(dy, dx) * (180 / Math.PI);
                 if (targetAngle > 90) targetAngle -= 180;
                 if (targetAngle < -90) targetAngle += 180;
@@ -161,6 +164,7 @@ export default function SeagullCursor() {
             if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
             const didPlayClickSound = playSeagullClickSound();
             setIsClicked(didPlayClickSound);
+            if (!visible) setVisible(true);
         };
 
         const handlePointerUp = (event: PointerEvent) => {
@@ -187,6 +191,8 @@ export default function SeagullCursor() {
             }
         };
     }, []);
+
+    if (!visible) return null;
 
     return (
         <div

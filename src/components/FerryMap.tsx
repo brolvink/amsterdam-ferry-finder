@@ -46,6 +46,11 @@ const NIGHT_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r
 const ZOOM_SCALE_FACTOR = 1.35;
 const MAX_ICON_SCALE = 3.25;
 
+const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+const MOBILE_MIN_WIDTH = 64;
+const MOBILE_MIN_HEIGHT = 40;
+const MOBILE_MIN_DOCK_SIZE = 44;
+
 const LANDMARKS = [
   {
     id: "ndsm-crane",
@@ -89,12 +94,15 @@ function getFerryIconVisualKey(color: string, isDocked: boolean, size: FerryIcon
 function getFerryIconSizeForZoom(zoom: number, baseZoom: number): FerryIconSize {
   // Scale icons with zoom: bigger when zooming in, smaller when zooming out.
   const zoomDelta = zoom - baseZoom;
+  const currentMinW = isMobile ? MOBILE_MIN_WIDTH : MIN_ICON_WIDTH;
+  const currentMinH = isMobile ? MOBILE_MIN_HEIGHT : MIN_ICON_HEIGHT;
+
   const scale = Math.min(
     MAX_ICON_SCALE,
-    Math.max(MIN_ICON_WIDTH / BASE_ICON_WIDTH, Math.pow(ZOOM_SCALE_FACTOR, zoomDelta))
+    Math.max(currentMinW / BASE_ICON_WIDTH, Math.pow(ZOOM_SCALE_FACTOR, zoomDelta))
   );
-  const width = Math.max(MIN_ICON_WIDTH, Math.round(BASE_ICON_WIDTH * scale));
-  const height = Math.max(MIN_ICON_HEIGHT, Math.round(BASE_ICON_HEIGHT * scale));
+  const width = Math.max(currentMinW, Math.round(BASE_ICON_WIDTH * scale));
+  const height = Math.max(currentMinH, Math.round(BASE_ICON_HEIGHT * scale));
 
   return {
     width,
@@ -111,11 +119,13 @@ function getMarkerIconSizeForZoom(
   minSize: number
 ): MarkerIconSize {
   const zoomDelta = zoom - baseZoom;
+  const currentMin = isMobile ? Math.max(minSize, MOBILE_MIN_DOCK_SIZE) : minSize;
+
   const scale = Math.min(
     MAX_ICON_SCALE,
-    Math.max(minSize / baseSize, Math.pow(ZOOM_SCALE_FACTOR, zoomDelta))
+    Math.max(currentMin / baseSize, Math.pow(ZOOM_SCALE_FACTOR, zoomDelta))
   );
-  const size = Math.max(minSize, Math.round(baseSize * scale));
+  const size = Math.max(currentMin, Math.round(baseSize * scale));
 
   return {
     size,
@@ -318,8 +328,19 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
     tileLayerRef.current = tileLayer;
     map.getContainer().classList.toggle("map-theme-night", isNight);
 
+    const enforceAmsterdamViewportLimit = () => {
+      // Recalculate minimum zoom from the current viewport size so users
+      // cannot zoom out to a view wider than Amsterdam.
+      const minZoom = map.getBoundsZoom(AMSTERDAM_BOUNDS, true);
+      map.setMinZoom(minZoom);
+      if (map.getZoom() < minZoom) {
+        map.setZoom(minZoom, { animate: false });
+      }
+      map.panInsideBounds(AMSTERDAM_BOUNDS, { animate: false });
+    };
+
     map.fitBounds(AMSTERDAM_BOUNDS);
-    map.setMinZoom(map.getBoundsZoom(AMSTERDAM_BOUNDS, true));
+    enforceAmsterdamViewportLimit();
     map.setMaxBounds(AMSTERDAM_BOUNDS);
     iconScaleBaseZoomRef.current = map.getZoom();
 
@@ -425,12 +446,14 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
     syncIconSize();
     map.on("zoom", syncIconSizeOnAnimationFrame);
     map.on("zoomend", syncIconSize);
+    map.on("resize", enforceAmsterdamViewportLimit);
 
     mapInstanceRef.current = map;
 
     return () => {
       map.off("zoom", syncIconSizeOnAnimationFrame);
       map.off("zoomend", syncIconSize);
+      map.off("resize", enforceAmsterdamViewportLimit);
       if (zoomSyncAnimationFrame !== null) {
         window.cancelAnimationFrame(zoomSyncAnimationFrame);
       }

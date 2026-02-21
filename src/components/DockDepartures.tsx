@@ -31,10 +31,10 @@ export default function DockDepartures({ dock, onClose }: DockDeparturesProps) {
         </div>
         <button
           onClick={onClose}
-          className="text-muted-foreground hover:text-card-foreground transition-colors p-1 rounded-full hover:bg-muted/70"
+          className="text-muted-foreground hover:text-card-foreground transition-colors p-2 -mr-1 rounded-full hover:bg-muted/70 active:bg-muted/90 shrink-0"
           aria-label="Close dock departures"
         >
-          <X size={14} />
+          <X size={20} className="md:w-[14px] md:h-[14px]" />
         </button>
       </div>
 
