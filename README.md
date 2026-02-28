@@ -30,17 +30,16 @@ npm run preview
 
 Schedule data lives in `src/data/ferryScheduleData.ts`.
 
-To refresh from an external source:
+To refresh from GVB:
 
 ```sh
 npm run update:ferry-schedules
 ```
 
-Environment variables used by the updater:
+The updater uses a fixed source URL:
+- `https://gvb.nl/en/travel-information/stops-and-timetable`
 
-- `FERRY_SCHEDULE_SOURCE_URL` (required)
-- `FERRY_SCHEDULE_SOURCE_TOKEN` (optional bearer token)
-- `FERRY_SCHEDULE_REFRESH_CADENCE` (`weekly` or `daily`, optional)
+It extracts timetable data weekly via GVB's timetable APIs through browser automation (Playwright), then rewrites `src/data/ferryScheduleData.ts`.
 
 GitHub Actions workflow: `.github/workflows/ferry-schedule-refresh.yml` (weekly by default).
 

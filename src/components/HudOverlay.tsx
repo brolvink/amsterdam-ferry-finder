@@ -137,7 +137,7 @@ export default function HudOverlay({
                 <img src="/ferry-indicator.png" alt="Ferry" className="w-10 h-10 md:w-12 md:h-12" />
               </span>
               <h1 className="font-display text-base md:text-lg font-bold tracking-wide text-amber-100">
-                ferrynice
+                ferry.nice
               </h1>
             </div>
             <div className="flex items-center gap-1.5">

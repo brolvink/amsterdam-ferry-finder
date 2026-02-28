@@ -19,8 +19,8 @@ interface FerryMapProps {
 
 const AMSTERDAM_CENTER: [number, number] = [52.3885, 4.9013];
 const AMSTERDAM_BOUNDS = L.latLngBounds(
-  [52.30, 4.73], // Southwest edge of Amsterdam area
-  [52.43, 5.05] // Northeast edge of Amsterdam area
+  [52.366, 4.868], // Incrementally expanded southwest edge around city-centre ferry network
+  [52.413, 4.955] // Incrementally expanded northeast edge around city-centre ferry network
 );
 const BASE_ZOOM_LEVEL = 14;
 const BASE_ICON_WIDTH = 92;
@@ -29,11 +29,11 @@ const MIN_ICON_WIDTH = 50;
 const MIN_ICON_HEIGHT = 32;
 const BASE_DOCK_ICON_SIZE = 48;
 const BASE_SHORT_LINE_STOP_ICON_SIZE = 52;
-const BASE_LANDMARK_ICON_SIZE = 72;
+const BASE_LANDMARK_ICON_SIZE = 80;
 const BASE_CENTRAL_EAST_ICON_SIZE = 72;
 const MIN_DOCK_ICON_SIZE = 32;
 const MIN_SHORT_LINE_STOP_ICON_SIZE = 36;
-const MIN_LANDMARK_ICON_SIZE = 42;
+const MIN_LANDMARK_ICON_SIZE = 46;
 const MIN_CENTRAL_EAST_ICON_SIZE = 42;
 const FERRY_ICON_URL = `${import.meta.env.BASE_URL}ferry-indicator.png`;
 const AZARTPLEIN_ICON_URL = `${import.meta.env.BASE_URL}azartplein-indicator.png`;
@@ -142,7 +142,7 @@ function getDockTooltipOffset(size: number): [number, number] {
 }
 
 function getLandmarkTooltipOffset(size: number): [number, number] {
-  return [0, -Math.round(size + 5)];
+  return [0, -Math.round(size * 0.6 + 4)];
 }
 
 function createFerryIcon(color: string, isDocked: boolean, size: FerryIconSize) {

@@ -22,11 +22,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
       - name: Update ferry schedule
-        env:
-          FERRY_SCHEDULE_SOURCE_URL: ${{ secrets.FERRY_SCHEDULE_SOURCE_URL }}
-          FERRY_SCHEDULE_SOURCE_TOKEN: ${{ secrets.FERRY_SCHEDULE_SOURCE_TOKEN }}
-          FERRY_SCHEDULE_REFRESH_CADENCE: weekly
         run: npm run update:ferry-schedules
 
       - name: Commit changes

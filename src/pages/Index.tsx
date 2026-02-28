@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo, type CSSProperties } from "react";
 import FerryMap from "@/components/FerryMap";
 import FerrySchedule from "@/components/FerrySchedule";
 import DockDepartures from "@/components/DockDepartures";
@@ -9,6 +9,14 @@ import { useAmsterdamWeather } from "@/hooks/useAmsterdamWeather";
 import { cn } from "@/lib/utils";
 
 type ThemeMode = "auto" | "day" | "night";
+type CloudVariant = "ac-cloud--chunky" | "ac-cloud--wide" | "ac-cloud--puffy" | "ac-cloud--flat";
+
+const CLOUD_VARIANTS: CloudVariant[] = ["ac-cloud--chunky", "ac-cloud--wide", "ac-cloud--puffy", "ac-cloud--flat"];
+
+function pickRandomVariant(previous?: CloudVariant): CloudVariant {
+  const nextOptions = previous ? CLOUD_VARIANTS.filter((variant) => variant !== previous) : CLOUD_VARIANTS;
+  return nextOptions[Math.floor(Math.random() * nextOptions.length)];
+}
 
 const Index = () => {
   const [selectedRoute, setSelectedRoute] = useState<FerryRoute | null>(null);
@@ -33,6 +41,36 @@ const Index = () => {
   const isCold = weather ? weather.temperatureC <= 7 || weather.feelsLikeC <= 5 : currentHour < 9 || currentHour >= 20;
   const isWet = weather ? weather.code >= 51 && weather.code <= 99 : false;
   const isWindy = weather ? weather.windSpeedKmh >= 22 : false;
+  const [cloudVariants, setCloudVariants] = useState<CloudVariant[]>(["ac-cloud--chunky", "ac-cloud--wide", "ac-cloud--puffy"]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCloudVariants((current) =>
+        current.map((variant) => {
+          if (Math.random() < 0.4) return pickRandomVariant(variant);
+          return variant;
+        }),
+      );
+    }, 12000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const cloudDurationSeconds = useMemo(() => {
+    const windSpeed = weather?.windSpeedKmh ?? 14;
+    const clampedWind = Math.min(45, Math.max(0, windSpeed));
+    const minDuration = 10;
+    const maxDuration = 34;
+    return maxDuration - (clampedWind / 45) * (maxDuration - minDuration);
+  }, [weather?.windSpeedKmh]);
+
+  const atmosphereStyle = useMemo(
+    () =>
+      ({
+        "--cloud-duration": `${cloudDurationSeconds.toFixed(1)}s`,
+      }) as CSSProperties,
+    [cloudDurationSeconds],
+  );
 
   const handleToggleTheme = useCallback(() => {
     setThemeMode((previous) => {
@@ -66,16 +104,12 @@ const Index = () => {
           isWet && "ac-atmosphere--wet",
           isWindy && "ac-atmosphere--windy",
         )}
+        style={atmosphereStyle}
       >
         {isNight ? <div className="ac-moon-glow" /> : <div className="ac-sun-glow" />}
-        <div className="ac-cloud" style={{ top: "12%", animationDelay: "-2s" }} />
-        <div className="ac-cloud" style={{ top: "20%", animationDelay: "-11s", opacity: 0.65 }} />
-        {isWet && (
-          <>
-            <div className="ac-rain ac-rain--far" />
-            <div className="ac-rain ac-rain--near" />
-          </>
-        )}
+        <div className={cn("ac-cloud", cloudVariants[0])} style={{ top: "5%", animationDelay: "-2s" }} />
+        <div className={cn("ac-cloud", cloudVariants[1])} style={{ top: "12%", animationDelay: "-11s", opacity: 0.65 }} />
+        <div className={cn("ac-cloud", cloudVariants[2])} style={{ top: "18%", animationDelay: "-6s", opacity: 0.5 }} />
         <div className="ac-water-shimmer" />
       </div>
 

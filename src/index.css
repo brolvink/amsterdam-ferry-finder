@@ -287,35 +287,112 @@
   }
 
   .ac-cloud {
+    --cloud-px: 10px;
+    --cloud-fill: hsl(0 0% 100% / 0.46);
+    --cloud-shade: hsl(198 36% 86% / 0.24);
+    --cloud-before-w: 4;
+    --cloud-before-h: 2;
+    --cloud-before-top: -2;
+    --cloud-before-left: 2;
+    --cloud-after-w: 3;
+    --cloud-after-h: 2;
+    --cloud-after-top: -1;
+    --cloud-after-right: 2;
     position: absolute;
-    width: 180px;
-    height: 54px;
-    border-radius: 999px;
-    background: hsl(0 0% 100% / 0.44);
-    filter: blur(1px);
-    animation: drift 22s linear infinite;
+    width: calc(var(--cloud-px) * 10);
+    height: calc(var(--cloud-px) * 4);
+    background: var(--cloud-fill);
+    image-rendering: pixelated;
+    animation: drift var(--cloud-duration, 22s) linear infinite;
+    box-shadow:
+      0 calc(var(--cloud-px) * 4) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 1) calc(var(--cloud-px) * 5) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 2) calc(var(--cloud-px) * 5) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 3) calc(var(--cloud-px) * 5) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 4) calc(var(--cloud-px) * 5) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 5) calc(var(--cloud-px) * 5) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 6) calc(var(--cloud-px) * 5) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 7) calc(var(--cloud-px) * 5) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 8) calc(var(--cloud-px) * 5) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 9) calc(var(--cloud-px) * 4) 0 var(--cloud-fill),
+      0 calc(var(--cloud-px) * 6) 0 var(--cloud-shade),
+      calc(var(--cloud-px) * 1) calc(var(--cloud-px) * 6) 0 var(--cloud-shade),
+      calc(var(--cloud-px) * 2) calc(var(--cloud-px) * 6) 0 var(--cloud-shade),
+      calc(var(--cloud-px) * 3) calc(var(--cloud-px) * 6) 0 var(--cloud-shade),
+      calc(var(--cloud-px) * 4) calc(var(--cloud-px) * 6) 0 var(--cloud-shade),
+      calc(var(--cloud-px) * 5) calc(var(--cloud-px) * 6) 0 var(--cloud-shade),
+      calc(var(--cloud-px) * 6) calc(var(--cloud-px) * 6) 0 var(--cloud-shade),
+      calc(var(--cloud-px) * 7) calc(var(--cloud-px) * 6) 0 var(--cloud-shade),
+      calc(var(--cloud-px) * 8) calc(var(--cloud-px) * 6) 0 var(--cloud-shade);
   }
 
   .ac-cloud::before,
   .ac-cloud::after {
     content: '';
     position: absolute;
-    background: inherit;
-    border-radius: 999px;
+    background: var(--cloud-fill);
   }
 
   .ac-cloud::before {
-    width: 70px;
-    height: 50px;
-    top: -26px;
-    left: 24px;
+    width: calc(var(--cloud-px) * var(--cloud-before-w));
+    height: calc(var(--cloud-px) * var(--cloud-before-h));
+    top: calc(var(--cloud-px) * var(--cloud-before-top));
+    left: calc(var(--cloud-px) * var(--cloud-before-left));
+    box-shadow:
+      calc(var(--cloud-px) * 1) calc(var(--cloud-px) * -1) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 2) calc(var(--cloud-px) * -1) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 3) 0 0 var(--cloud-fill);
   }
 
   .ac-cloud::after {
-    width: 80px;
-    height: 44px;
-    top: -16px;
-    right: 30px;
+    width: calc(var(--cloud-px) * var(--cloud-after-w));
+    height: calc(var(--cloud-px) * var(--cloud-after-h));
+    top: calc(var(--cloud-px) * var(--cloud-after-top));
+    right: calc(var(--cloud-px) * var(--cloud-after-right));
+    box-shadow:
+      calc(var(--cloud-px) * 1) calc(var(--cloud-px) * -1) 0 var(--cloud-fill),
+      calc(var(--cloud-px) * 2) 0 0 var(--cloud-fill);
+  }
+
+  .ac-cloud--chunky {
+    --cloud-px: 11px;
+    --cloud-before-w: 5;
+    --cloud-before-left: 1;
+    --cloud-after-w: 4;
+    --cloud-after-top: -2;
+  }
+
+  .ac-cloud--wide {
+    --cloud-px: 9px;
+    --cloud-before-w: 3;
+    --cloud-before-left: 3;
+    --cloud-after-right: 1;
+    width: calc(var(--cloud-px) * 12);
+  }
+
+  .ac-cloud--puffy {
+    --cloud-px: 10px;
+    --cloud-before-w: 4;
+    --cloud-before-h: 3;
+    --cloud-before-top: -3;
+    --cloud-before-left: 3;
+    --cloud-after-w: 4;
+    --cloud-after-h: 3;
+    --cloud-after-top: -2;
+    --cloud-after-right: 3;
+  }
+
+  .ac-cloud--flat {
+    --cloud-px: 9px;
+    --cloud-before-w: 3;
+    --cloud-before-h: 2;
+    --cloud-before-top: -1;
+    --cloud-before-left: 1;
+    --cloud-after-w: 2;
+    --cloud-after-h: 1;
+    --cloud-after-top: -1;
+    --cloud-after-right: 1;
+    width: calc(var(--cloud-px) * 11);
   }
 
   .ac-water-shimmer {
@@ -334,42 +411,10 @@
     animation: tide 5s ease-in-out infinite;
   }
 
-  .ac-rain {
-    position: absolute;
-    inset: 0;
-    background-repeat: repeat;
-    pointer-events: none;
-  }
-
-  .ac-rain--far {
-    opacity: 0.22;
-    background-image: linear-gradient(
-      172deg,
-      transparent 0%,
-      transparent 46%,
-      hsl(201 80% 86% / 0.45) 48%,
-      transparent 50%
-    );
-    background-size: 16px 20px;
-    animation: rain-fall 0.9s linear infinite;
-  }
-
-  .ac-rain--near {
-    opacity: 0.3;
-    background-image: linear-gradient(
-      172deg,
-      transparent 0%,
-      transparent 42%,
-      hsl(202 90% 93% / 0.5) 46%,
-      transparent 52%
-    );
-    background-size: 24px 28px;
-    animation: rain-fall 0.55s linear infinite;
-  }
-
   .ac-atmosphere--night .ac-cloud {
-    opacity: 0.33;
-    filter: blur(1.5px);
+    --cloud-fill: hsl(209 68% 93% / 0.3);
+    --cloud-shade: hsl(213 38% 70% / 0.24);
+    opacity: 0.38;
   }
 
   .ac-atmosphere--night .ac-water-shimmer {
@@ -386,7 +431,6 @@
 
   .ac-atmosphere--cold .ac-cloud {
     opacity: 0.3;
-    animation-duration: 34s;
   }
 
   .ac-atmosphere--cold .ac-water-shimmer {
@@ -395,10 +439,6 @@
 
   .ac-atmosphere--wet .ac-cloud {
     opacity: 0.22;
-  }
-
-  .ac-atmosphere--windy .ac-cloud {
-    animation-duration: 14s;
   }
 
   .bobbing {
@@ -464,11 +504,6 @@
 @keyframes tide {
   0%, 100% { opacity: 0.9; }
   50% { opacity: 0.55; }
-}
-
-@keyframes rain-fall {
-  0% { background-position: 0 0; }
-  100% { background-position: -20px 70px; }
 }
 
 /* Leaflet map — warm, soft, Animal Crossing style */
