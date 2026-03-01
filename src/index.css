@@ -288,8 +288,8 @@
 
   .ac-cloud {
     --cloud-px: 10px;
-    --cloud-fill: hsl(0 0% 100% / 0.46);
-    --cloud-shade: hsl(198 36% 86% / 0.24);
+    --cloud-fill: hsl(0 0% 100% / 0.34);
+    --cloud-shade: hsl(198 36% 86% / 0.16);
     --cloud-before-w: 4;
     --cloud-before-h: 2;
     --cloud-before-top: -2;
@@ -412,8 +412,8 @@
   }
 
   .ac-atmosphere--night .ac-cloud {
-    --cloud-fill: hsl(209 68% 93% / 0.3);
-    --cloud-shade: hsl(213 38% 70% / 0.24);
+    --cloud-fill: hsl(209 68% 93% / 0.24);
+    --cloud-shade: hsl(213 38% 70% / 0.18);
     opacity: 0.38;
   }
 
