@@ -9,6 +9,9 @@ interface FerryScheduleProps {
 export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
   const departures = getNextDepartures(route.id);
   const scheduleMeta = getScheduleMeta();
+  const hasDepartures = departures.length > 0;
+  const estimatedIntervalMinutes = Number.parseInt(route.frequency.match(/\d+/)?.[0] ?? "10", 10);
+  const isEstimatedIntervalValid = Number.isFinite(estimatedIntervalMinutes) && estimatedIntervalMinutes > 0;
   const statusText =
     route.status === "active" ? "Smooth Sailing" : route.status === "delayed" ? "Running Late" : "In Harbor";
 
@@ -87,28 +90,34 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
         {/* Departures */}
         <div>
           <h4 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 font-display font-bold">
-            Bell Board: Next Boats
+            Bell Board: {hasDepartures ? "Next Boats" : "Estimated Service"}
           </h4>
           <div className="space-y-1">
-            {departures.map((time, i) => (
-              <div
-                key={time + i}
-                className="flex items-center justify-between text-xs py-1.5 px-3 rounded-xl hover:bg-muted/55 transition-colors font-medium"
-                style={{ animationDelay: `${i * 60}ms`, animation: "float-up 0.4s ease-out forwards", opacity: 0 }}
-              >
-                <span className="text-card-foreground font-bold">{time}</span>
-                <span className="text-muted-foreground">
-                  {i === 0 ? (
-                    <span className="font-bold text-card-foreground inline-flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: route.color }} />
-                      Boarding now
-                    </span>
-                  ) : (
-                    `+${i * parseInt(route.frequency.match(/\d+/)?.[0] || "10")}m`
-                  )}
-                </span>
+            {hasDepartures ? (
+              departures.map((time, i) => (
+                <div
+                  key={time + i}
+                  className="flex items-center justify-between text-xs py-1.5 px-3 rounded-xl hover:bg-muted/55 transition-colors font-medium"
+                  style={{ animationDelay: `${i * 60}ms`, animation: "float-up 0.4s ease-out forwards", opacity: 0 }}
+                >
+                  <span className="text-card-foreground font-bold">{time}</span>
+                  <span className="text-muted-foreground">
+                    {i === 0 ? (
+                      <span className="font-bold text-card-foreground inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: route.color }} />
+                        Boarding now
+                      </span>
+                    ) : (
+                      `+${i * (isEstimatedIntervalValid ? estimatedIntervalMinutes : 10)}m`
+                    )}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs py-2 px-3 rounded-xl bg-muted/45 border border-border/60 text-muted-foreground font-medium">
+                Limited timetable data. Service is estimated around every {isEstimatedIntervalValid ? estimatedIntervalMinutes : 10} min.
               </div>
-            ))}
+            )}
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground">
             Timetable source: {scheduleMeta.source} · updated{" "}

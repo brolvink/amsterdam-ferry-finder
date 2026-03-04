@@ -55,15 +55,21 @@ export default function DockDepartures({ dock, onClose }: DockDeparturesProps) {
               </span>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {departures.map((time, i) => (
-                <span
-                  key={`${route.id}-${time}-${i}`}
-                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold bg-background/80 text-card-foreground border border-border/60"
-                >
-                  <Clock size={10} />
-                  {time}
+              {departures.length > 0 ? (
+                departures.map((time, i) => (
+                  <span
+                    key={`${route.id}-${time}-${i}`}
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold bg-background/80 text-card-foreground border border-border/60"
+                  >
+                    <Clock size={10} />
+                    {time}
+                  </span>
+                ))
+              ) : (
+                <span className="inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold bg-background/80 text-muted-foreground border border-border/60">
+                  No live departures yet, showing route estimates.
                 </span>
-              ))}
+              )}
             </div>
           </div>
         ))}

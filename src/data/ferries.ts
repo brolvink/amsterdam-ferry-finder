@@ -44,6 +44,13 @@ export interface FerryPosition {
 }
 
 const SIMULATION_TIME_SCALE = 1;
+const DEFAULT_FREQUENCY_MINUTES = 10;
+const DEFAULT_DURATION_MINUTES = 6;
+const FALLBACK_SCHEDULE_META: FerryScheduleMeta = {
+  source: "GVB official timetable (auto-synced)",
+  lastUpdated: new Date(0).toISOString(),
+  refreshCadence: "weekly",
+};
 
 const routeWaypoints: Record<string, [number, number][]> = {
   f1: [
@@ -177,17 +184,40 @@ const baseRoutes: BaseRouteDef[] = [
 ];
 
 const routeScheduleById = new Map<string, FerryScheduleEntry>(
-  ferryScheduleData.routes.map((r) => [r.id, r])
+  (Array.isArray(ferryScheduleData?.routes) ? ferryScheduleData.routes : []).map((r) => [r.id, r])
 );
+
+function sanitizeRouteStatus(status: unknown, fallback: FerryRouteStatus): FerryRouteStatus {
+  return status === "active" || status === "delayed" || status === "offline" ? status : fallback;
+}
+
+function sanitizeScheduleEntry(
+  routeId: string,
+  schedule: Partial<FerryScheduleEntry> | undefined,
+  defaults: BaseRouteDef["defaults"]
+): FerryScheduleEntry {
+  const frequencyText = typeof schedule?.frequency === "string" ? schedule.frequency.trim() : "";
+  const operatingHoursText = typeof schedule?.operatingHours === "string" ? schedule.operatingHours.trim() : "";
+  const duration = Number(schedule?.duration);
+
+  return {
+    id: routeId,
+    frequency: frequencyText.length > 0 ? frequencyText : defaults.frequency,
+    duration: Number.isFinite(duration) && duration > 0 ? duration : defaults.duration,
+    operatingHours: operatingHoursText.length > 0 ? operatingHoursText : defaults.operatingHours,
+    status: sanitizeRouteStatus(schedule?.status, defaults.status),
+  };
+}
 
 export const ferryRoutes: FerryRoute[] = baseRoutes.map((baseRoute) => {
   const [dockA, dockB] = baseRoute.dockIds.map(
     (dockId) => ferryDocks.find((dock) => dock.id === dockId) as FerryDock
   ) as [FerryDock, FerryDock];
-  const schedule = routeScheduleById.get(baseRoute.id) ?? {
-    id: baseRoute.id,
-    ...baseRoute.defaults,
-  };
+  const schedule = sanitizeScheduleEntry(
+    baseRoute.id,
+    routeScheduleById.get(baseRoute.id),
+    baseRoute.defaults
+  );
 
   return {
     id: baseRoute.id,
@@ -284,13 +314,44 @@ function interpolateAlongPath(path: GeoPoint[], progress: number): { lat: number
   };
 }
 
-function parseFrequencyMinutes(frequency: string): number {
+function parseFrequencyMinutes(frequency: unknown): number {
+  if (typeof frequency !== "string") return DEFAULT_FREQUENCY_MINUTES;
   // Take the lower bound for ranges like "10-30 min"
-  return parseInt(frequency.match(/\d+/)?.[0] ?? "10", 10);
+  const parsed = Number.parseInt(frequency.match(/\d+/)?.[0] ?? `${DEFAULT_FREQUENCY_MINUTES}`, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_FREQUENCY_MINUTES;
+}
+
+function normalizeDurationMinutes(duration: unknown): number {
+  const parsed = Number(duration);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_DURATION_MINUTES;
+}
+
+function parseClockToMinutes(clock: string): number | null {
+  const match = clock.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2], 10);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
 }
 
 export function getScheduleMeta(): FerryScheduleMeta {
-  return ferryScheduleData.meta;
+  const incomingMeta = ferryScheduleData?.meta;
+  const source = typeof incomingMeta?.source === "string" && incomingMeta.source.trim().length > 0
+    ? incomingMeta.source.trim()
+    : FALLBACK_SCHEDULE_META.source;
+  const parsedLastUpdated = Date.parse(typeof incomingMeta?.lastUpdated === "string" ? incomingMeta.lastUpdated : "");
+  const refreshCadence = incomingMeta?.refreshCadence === "daily" || incomingMeta?.refreshCadence === "weekly"
+    ? incomingMeta.refreshCadence
+    : FALLBACK_SCHEDULE_META.refreshCadence;
+
+  return {
+    source,
+    lastUpdated: Number.isFinite(parsedLastUpdated)
+      ? new Date(parsedLastUpdated).toISOString()
+      : FALLBACK_SCHEDULE_META.lastUpdated,
+    refreshCadence,
+  };
 }
 
 function isRouteOperating(route: FerryRoute, now: Date): boolean {
@@ -309,13 +370,16 @@ function isRouteOperating(route: FerryRoute, now: Date): boolean {
   if (!match) return true;
 
   const [_, startStr, endStr] = match;
-  const currentTimeStr = now.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  const startMinutes = parseClockToMinutes(startStr);
+  const endMinutes = parseClockToMinutes(endStr);
+  if (startMinutes === null || endMinutes === null) return true;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  if (startStr <= endStr) {
-    return currentTimeStr >= startStr && currentTimeStr < endStr;
+  if (startMinutes <= endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
   } else {
     // Over midnight e.g. 07:00 - 02:00
-    return currentTimeStr >= startStr || currentTimeStr < endStr;
+    return currentMinutes >= startMinutes || currentMinutes < endMinutes;
   }
 }
 
@@ -333,15 +397,15 @@ export function getSimulatedPositions(): FerryPosition[] {
     .flatMap((route) => {
       const [dockA, dockB] = route.docks;
       const frequency = parseFrequencyMinutes(route.frequency);
-      const sailingDuration = route.duration;
+      const sailingDuration = normalizeDurationMinutes(route.duration);
 
       // Calculate how many ferries are needed to sustain this frequency.
       // We need enough ferries so that a round trip (2*duration + 2*dockTime) 
       // fits into the combined schedule slots.
       // Min dock time is 1 min as per user requirement.
       const roundTripMin = 2 * (sailingDuration + 1);
-      const numFerries = Math.ceil(roundTripMin / frequency);
-      const cycleMinutes = numFerries * frequency;
+      const numFerries = Math.max(1, Math.ceil(roundTripMin / frequency));
+      const cycleMinutes = Math.max(frequency, numFerries * frequency);
       const legDuration = cycleMinutes / 2; // Time between departing A and departing B
 
       const outboundPath = route.path;
@@ -448,14 +512,17 @@ export function getNextDeparturesFromDock(routeId: string, dockId: string, count
 
   const frequencyMinutes = parseFrequencyMinutes(route.frequency);
   const frequencyMs = frequencyMinutes * 60 * 1000;
+  if (!Number.isFinite(frequencyMs) || frequencyMs <= 0) return [];
   const nowMs = Date.now();
   const offsetMs = getDockDepartureOffsetMinutes(route, dockId) * 60 * 1000;
   const cycleIndex = Math.floor((nowMs - offsetMs) / frequencyMs);
   const nextBaseMs = offsetMs + (cycleIndex + 1) * frequencyMs;
+  const safeCount = Number.isFinite(count) && count > 0 ? Math.min(Math.floor(count), 12) : 5;
 
   const departures: string[] = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < safeCount; i++) {
     const departure = new Date(nextBaseMs + i * frequencyMs);
+    if (!Number.isFinite(departure.getTime())) continue;
     departures.push(
       departure.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })
     );
@@ -468,7 +535,7 @@ function getDockDepartureOffsetMinutes(route: FerryRoute, dockId: string): numbe
   if (route.docks[0].id === dockId) return 0;
 
   const frequency = parseFrequencyMinutes(route.frequency);
-  const roundTripMinutes = 2 * (route.duration + 1);
+  const roundTripMinutes = 2 * (normalizeDurationMinutes(route.duration) + 1);
   const ferryCount = Math.ceil(roundTripMinutes / frequency);
   return (ferryCount * frequency) / 2;
 }

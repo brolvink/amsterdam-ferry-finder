@@ -22,7 +22,7 @@ export interface FerryScheduleData {
 const ferryScheduleData: FerryScheduleData = {
   meta: {
     source: "https://gvb.nl/en/travel-information/stops-and-timetable (GVB timetable APIs via browser automation)",
-    lastUpdated: "2026-02-22T15:55:22.417Z",
+    lastUpdated: "2026-03-04T18:59:56.529Z",
     refreshCadence: "weekly",
   },
   routes: [
@@ -49,9 +49,9 @@ const ferryScheduleData: FerryScheduleData = {
     },
     {
       id: "f4",
-      frequency: "Every 7-15 min",
+      frequency: "Every 15 min",
       duration: 6,
-      operatingHours: "06:38 - 22:38",
+      operatingHours: "06:30 - 22:45",
       status: "active",
     },
     {
@@ -63,9 +63,9 @@ const ferryScheduleData: FerryScheduleData = {
     },
     {
       id: "f6",
-      frequency: "Every 30 min",
+      frequency: "Every 10-20 min",
       duration: 6,
-      operatingHours: "07:00 - 23:30",
+      operatingHours: "06:20 - 23:40",
       status: "active",
     },
   ],
