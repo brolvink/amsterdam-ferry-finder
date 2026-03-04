@@ -110,7 +110,7 @@ export default function HudOverlay({
               <span className="text-lg inline-flex items-center leading-none shrink-0">
                 <img src="/ferry-indicator.png" alt="Ferry" className="w-8 h-8 md:w-12 md:h-12" />
               </span>
-              <h1 className="font-display text-sm md:text-lg font-bold tracking-wide text-amber-100 truncate">
+              <h1 className="font-display text-lg md:text-xl font-bold tracking-wide text-amber-100 truncate">
                 ferry.nice
               </h1>
             </div>

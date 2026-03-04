@@ -84,11 +84,12 @@ const Index = () => {
   return (
     <div
       className={cn(
-        "relative w-screen h-screen overflow-hidden bg-background weather-theme",
+        "relative w-screen overflow-hidden bg-background weather-theme",
         isNight && "weather-theme-night",
         isCold && "weather-theme-cold",
         isWet && "weather-theme-wet",
       )}
+      style={{ minHeight: "100svh", height: "100dvh" }}
     >
       <FerryMap
         onSelectRoute={handleSelectRoute}
@@ -125,13 +126,13 @@ const Index = () => {
       <SeagullCursor />
 
       {selectedRoute && (
-        <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-[1001] w-[min(20rem,calc(100vw-1.5rem))] md:w-80">
+        <div className="absolute right-3 md:right-4 z-[1001] w-[min(20rem,calc(100vw-1.5rem))] md:w-80" style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
           <FerrySchedule route={selectedRoute} onClose={() => setSelectedRoute(null)} />
         </div>
       )}
 
       {selectedDock && (
-        <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-[1001] w-[min(20rem,calc(100vw-1.5rem))] md:w-80">
+        <div className="absolute right-3 md:right-4 z-[1001] w-[min(20rem,calc(100vw-1.5rem))] md:w-80" style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
           <DockDepartures dock={selectedDock} onClose={() => setSelectedDock(null)} />
         </div>
       )}

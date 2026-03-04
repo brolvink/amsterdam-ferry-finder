@@ -16,7 +16,7 @@ export default function FerrySchedule({ route, onClose }: FerryScheduleProps) {
     route.status === "active" ? "Smooth Sailing" : route.status === "delayed" ? "Running Late" : "In Harbor";
 
   return (
-    <div className="wood-panel-dark-card overflow-hidden animate-bounce-in backdrop-blur-[1px]">
+    <div className="wood-panel-dark-card max-h-[78vh] max-h-[78dvh] overflow-y-auto no-scrollbar animate-bounce-in backdrop-blur-[1px]">
       {/* Colored header bar */}
       <div
         className="px-4 py-3 flex items-center justify-between border-b border-border/80"

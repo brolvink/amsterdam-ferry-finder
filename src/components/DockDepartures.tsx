@@ -21,7 +21,7 @@ export default function DockDepartures({ dock, onClose }: DockDeparturesProps) {
     }));
 
   return (
-    <div className="wood-panel-dark-card flex flex-col min-h-[340px] max-h-[80vh] overflow-hidden animate-bounce-in backdrop-blur-[1px]">
+    <div className="wood-panel-dark-card flex flex-col min-h-[260px] md:min-h-[340px] max-h-[78vh] max-h-[78dvh] overflow-hidden animate-bounce-in backdrop-blur-[1px]">
       {/* Decorative colored header */}
       <div
         className="px-4 py-3 shrink-0 flex items-center justify-between border-b border-border/80"

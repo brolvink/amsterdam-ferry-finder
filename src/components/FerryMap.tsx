@@ -548,7 +548,7 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
   }, [selectedRouteId]);
 
   return (
-    <div className="relative w-full h-full" style={{ minHeight: 600 }}>
+    <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full" />
     </div>
   );
