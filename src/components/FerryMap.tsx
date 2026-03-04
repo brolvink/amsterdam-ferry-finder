@@ -134,15 +134,15 @@ function getMarkerIconSizeForZoom(
 }
 
 function getFerryTooltipOffset(size: FerryIconSize): [number, number] {
-  return [0, -Math.round(size.height / 2 + 5)];
+  return [0, -Math.round(size.height / 2 + 2)];
 }
 
 function getDockTooltipOffset(size: number): [number, number] {
-  return [0, -Math.round(size / 2 + 5)];
+  return [0, 0];
 }
 
 function getLandmarkTooltipOffset(size: number): [number, number] {
-  return [0, -Math.round(size * 0.6 + 4)];
+  return [0, -Math.round(size / 2 - 8)];
 }
 
 function createFerryIcon(color: string, isDocked: boolean, size: FerryIconSize) {
@@ -202,8 +202,8 @@ function createDockIcon(dockId: string, zoom: number, baseZoom: number) {
       iconUrl: NACO_HUISJE_ICON_URL,
       iconSize: [size, size],
       iconAnchor: [half, half],
-      popupAnchor: [0, -half],
-      tooltipAnchor: [0, -(half - 2)],
+      popupAnchor: [0, -Math.round(half + 10)],
+      tooltipAnchor: [0, -Math.round(half + 4)],
       className: "dock-marker-img",
     });
   }
@@ -220,8 +220,8 @@ function createDockIcon(dockId: string, zoom: number, baseZoom: number) {
       iconUrl: AZARTPLEIN_ICON_URL,
       iconSize: [size, size],
       iconAnchor: [half, half],
-      popupAnchor: [0, -half],
-      tooltipAnchor: [0, -(half - 2)],
+      popupAnchor: [0, -Math.round(half + 10)],
+      tooltipAnchor: [0, -Math.round(half + 4)],
       className: "dock-marker-img",
     });
   }
@@ -237,8 +237,8 @@ function createDockIcon(dockId: string, zoom: number, baseZoom: number) {
     iconUrl: CS_DOCK_ICON_URL,
     iconSize: [size, size],
     iconAnchor: [half, half],
-    popupAnchor: [0, -half],
-    tooltipAnchor: [0, -(half - 2)],
+    popupAnchor: [0, -Math.round(half + 10)],
+    tooltipAnchor: [0, -Math.round(half + 4)],
     className: "dock-marker-img",
   });
 }
@@ -286,8 +286,8 @@ function createLandmarkIcon(image: string, zoom: number, baseZoom: number) {
     iconUrl: `${import.meta.env.BASE_URL}${image}`,
     iconSize: [size, size],
     iconAnchor: [Math.round(size / 2), size],
-    popupAnchor: [0, -size],
-    tooltipAnchor: [0, -size],
+    popupAnchor: [0, -Math.round(size * 0.75)],
+    tooltipAnchor: [0, -Math.round(size * 0.75)],
     className: "landmark-marker-img",
   });
 }
@@ -370,15 +370,6 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
       marker.bindTooltip(landmark.name, {
         direction: "top",
         offset: getLandmarkTooltipOffset(landmarkIconSize.size),
-      });
-      marker.on("click", () => {
-        L.popup()
-          .setLatLng([landmark.lat, landmark.lng])
-          .setContent(`<div style="font-family: 'Quicksand', sans-serif; font-size: 13px; font-weight: 600; padding: 4px;">
-            <strong style="color: #1a1a1a;">${landmark.name}</strong><br/>
-            <span style="color: #666;">Beautiful harbor landmark</span>
-          </div>`)
-          .openOn(map);
       });
       landmarkMarkersRef.current.set(landmark.id, marker);
     });

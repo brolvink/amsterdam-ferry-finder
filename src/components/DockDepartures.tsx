@@ -1,4 +1,4 @@
-import { Clock, Navigation, X } from "lucide-react";
+import { Clock, Navigation, X, Anchor } from "lucide-react";
 import {
   ferryRoutes,
   type FerryDock,
@@ -21,13 +21,22 @@ export default function DockDepartures({ dock, onClose }: DockDeparturesProps) {
     }));
 
   return (
-    <div className="wood-panel-dark-card overflow-hidden animate-bounce-in backdrop-blur-[1px]">
-      <div className="px-4 py-3 flex items-center justify-between border-b border-border/80 bg-muted/30">
+    <div className="wood-panel-dark-card flex flex-col min-h-[340px] max-h-[80vh] overflow-hidden animate-bounce-in backdrop-blur-[1px]">
+      {/* Decorative colored header */}
+      <div
+        className="px-4 py-3 shrink-0 flex items-center justify-between border-b border-border/80"
+        style={{ background: `linear-gradient(180deg, hsl(193 56% 58% / 0.15) 0%, hsl(193 56% 58% / 0.05) 100%)` }}
+      >
         <div className="flex items-center gap-2">
-          <span className="font-display text-sm font-bold tracking-wide text-card-foreground">
-            {dock.name}
-          </span>
-          <span className="text-[10px] font-semibold text-muted-foreground">Departures</span>
+          <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center border border-accent/40 shadow-sm shrink-0">
+            <Anchor size={12} className="text-accent-foreground drop-shadow-sm" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-display text-[15px] leading-none font-bold tracking-wide text-card-foreground">
+              {dock.name}
+            </span>
+            <span className="text-[10px] uppercase tracking-widest mt-0.5 font-bold text-muted-foreground/80">Departures</span>
+          </div>
         </div>
         <button
           onClick={onClose}
@@ -38,33 +47,60 @@ export default function DockDepartures({ dock, onClose }: DockDeparturesProps) {
         </button>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-3.5 space-y-3 flex-1 overflow-y-auto no-scrollbar">
         {routeDepartures.map(({ route, departures, destination }) => (
-          <div key={route.id} className="rounded-xl border border-border/60 bg-muted/45 p-3">
-            <div className="flex items-center justify-between gap-2 mb-2">
+          <div
+            key={route.id}
+            className="rounded-xl border relative overflow-hidden p-3 shadow-sm transition-transform hover:scale-[1.01]"
+            style={{
+              borderColor: `${route.color}40`,
+              backgroundColor: `${route.color}08`,
+            }}
+          >
+            {/* Subtle stripe pattern background for visual interest */}
+            <div
+              className="absolute inset-0 opacity-[0.03] pointer-events-none"
+              style={{ background: `repeating-linear-gradient(45deg, ${route.color}, ${route.color} 2px, transparent 2px, transparent 12px)` }}
+            />
+
+            <div className="flex items-start justify-between gap-2 mb-3 relative z-10">
               <div className="flex items-center gap-2 min-w-0">
                 <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ background: route.color }}
-                />
-                <span className="text-xs font-bold text-card-foreground truncate">{route.code}</span>
+                  className="font-display shadow-sm text-sm font-bold tracking-wide text-card-foreground px-1.5 py-0.5 rounded-md border"
+                  style={{
+                    background: `${route.color}25`,
+                    borderColor: `${route.color}60`,
+                  }}
+                >
+                  {route.code}
+                </span>
+                <span className="text-[11px] font-semibold text-card-foreground/90 inline-flex flex-wrap items-center gap-1.5 mt-0.5">
+                  <Navigation size={10} className="opacity-60" />
+                  To {destination}
+                </span>
               </div>
-              <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1">
-                <Navigation size={10} />
-                To {destination}
-              </span>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+
+            <div className="flex flex-wrap gap-1.5 relative z-10">
               {departures.length > 0 ? (
-                departures.map((time, i) => (
-                  <span
-                    key={`${route.id}-${time}-${i}`}
-                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold bg-background/80 text-card-foreground border border-border/60"
-                  >
-                    <Clock size={10} />
-                    {time}
-                  </span>
-                ))
+                departures.map((time, i) => {
+                  const isNext = i === 0;
+                  return (
+                    <span
+                      key={`${route.id}-${time}-${i}`}
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border transition-colors shadow-sm"
+                      style={{
+                        background: isNext ? `${route.color}25` : 'var(--background)',
+                        borderColor: isNext ? `${route.color}60` : 'var(--border)',
+                        color: isNext ? 'var(--card-foreground)' : 'var(--muted-foreground)',
+                      }}
+                    >
+                      <Clock size={10} className={isNext ? "" : "opacity-60"} />
+                      {time}
+                      {isNext && <span className="ml-1 w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: route.color }} />}
+                    </span>
+                  );
+                })
               ) : (
                 <span className="inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold bg-background/80 text-muted-foreground border border-border/60">
                   No live departures yet, showing route estimates.

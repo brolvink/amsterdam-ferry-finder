@@ -125,13 +125,13 @@ const Index = () => {
       <SeagullCursor />
 
       {selectedRoute && (
-        <div className="absolute bottom-3 left-3 right-3 md:left-auto md:bottom-4 md:right-4 z-[1001] md:w-80">
+        <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-[1001] w-[min(20rem,calc(100vw-1.5rem))] md:w-80">
           <FerrySchedule route={selectedRoute} onClose={() => setSelectedRoute(null)} />
         </div>
       )}
 
       {selectedDock && (
-        <div className="absolute bottom-3 left-3 right-3 md:left-auto md:bottom-4 md:right-4 z-[1001] md:w-80">
+        <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-[1001] w-[min(20rem,calc(100vw-1.5rem))] md:w-80">
           <DockDepartures dock={selectedDock} onClose={() => setSelectedDock(null)} />
         </div>
       )}
