@@ -302,6 +302,7 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
   const landmarkMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const iconScaleBaseZoomRef = useRef(BASE_ZOOM_LEVEL);
   const routeLinesRef = useRef<L.Polyline[]>([]);
+  const initialIsNightRef = useRef(isNight);
   const [positions, setPositions] = useState<FerryPosition[]>([]);
   const [ferryIconSize, setFerryIconSize] = useState<FerryIconSize>(() =>
     getFerryIconSizeForZoom(BASE_ZOOM_LEVEL, BASE_ZOOM_LEVEL)
@@ -310,6 +311,12 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
     const markerStore = ferryMarkersRef.current;
+    const ferryMarkerVisualKeys = ferryMarkerVisualKeysRef.current;
+    const dockMarkers = dockMarkersRef.current;
+    const landmarkMarkers = landmarkMarkersRef.current;
+    let zoomSyncAnimationFrame: number | null = null;
+    let relayoutAnimationFrame: number | null = null;
+    const relayoutTimeouts: number[] = [];
 
     const map = L.map(mapRef.current, {
       center: AMSTERDAM_CENTER,
@@ -320,13 +327,13 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
       maxBoundsViscosity: 1.0,
     });
 
-    const tileLayer = L.tileLayer(isNight ? NIGHT_TILE_URL : DAY_TILE_URL, {
+    const tileLayer = L.tileLayer(initialIsNightRef.current ? NIGHT_TILE_URL : DAY_TILE_URL, {
       attribution:
         '&copy; <a href="https://osm.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 18,
     }).addTo(map);
     tileLayerRef.current = tileLayer;
-    map.getContainer().classList.toggle("map-theme-night", isNight);
+    map.getContainer().classList.toggle("map-theme-night", initialIsNightRef.current);
 
     const enforceAmsterdamViewportLimit = () => {
       // Recalculate minimum zoom from the current viewport size so users
@@ -337,6 +344,17 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
         map.setZoom(minZoom, { animate: false });
       }
       map.panInsideBounds(AMSTERDAM_BOUNDS, { animate: false });
+    };
+    const scheduleMapRelayout = () => {
+      if (relayoutAnimationFrame !== null) return;
+
+      relayoutAnimationFrame = window.requestAnimationFrame(() => {
+        relayoutAnimationFrame = null;
+        if (!mapInstanceRef.current) return;
+
+        map.invalidateSize({ pan: false, animate: false });
+        enforceAmsterdamViewportLimit();
+      });
     };
 
     map.fitBounds(AMSTERDAM_BOUNDS);
@@ -426,7 +444,6 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
         }
       });
     };
-    let zoomSyncAnimationFrame: number | null = null;
     const syncIconSizeOnAnimationFrame = () => {
       if (zoomSyncAnimationFrame !== null) return;
       zoomSyncAnimationFrame = window.requestAnimationFrame(() => {
@@ -438,6 +455,25 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
     map.on("zoom", syncIconSizeOnAnimationFrame);
     map.on("zoomend", syncIconSize);
     map.on("resize", enforceAmsterdamViewportLimit);
+    map.whenReady(scheduleMapRelayout);
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            scheduleMapRelayout();
+          })
+        : null;
+    resizeObserver?.observe(map.getContainer());
+
+    const visualViewport = window.visualViewport;
+    visualViewport?.addEventListener("resize", scheduleMapRelayout);
+    visualViewport?.addEventListener("scroll", scheduleMapRelayout);
+    window.addEventListener("orientationchange", scheduleMapRelayout);
+    window.addEventListener("pageshow", scheduleMapRelayout);
+
+    relayoutTimeouts.push(window.setTimeout(scheduleMapRelayout, 0));
+    relayoutTimeouts.push(window.setTimeout(scheduleMapRelayout, 250));
+    relayoutTimeouts.push(window.setTimeout(scheduleMapRelayout, 1000));
 
     mapInstanceRef.current = map;
 
@@ -445,16 +481,25 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
       map.off("zoom", syncIconSizeOnAnimationFrame);
       map.off("zoomend", syncIconSize);
       map.off("resize", enforceAmsterdamViewportLimit);
+      resizeObserver?.disconnect();
+      visualViewport?.removeEventListener("resize", scheduleMapRelayout);
+      visualViewport?.removeEventListener("scroll", scheduleMapRelayout);
+      window.removeEventListener("orientationchange", scheduleMapRelayout);
+      window.removeEventListener("pageshow", scheduleMapRelayout);
+      relayoutTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
       if (zoomSyncAnimationFrame !== null) {
         window.cancelAnimationFrame(zoomSyncAnimationFrame);
+      }
+      if (relayoutAnimationFrame !== null) {
+        window.cancelAnimationFrame(relayoutAnimationFrame);
       }
       map.remove();
       mapInstanceRef.current = null;
       tileLayerRef.current = null;
       markerStore.clear();
-      ferryMarkerVisualKeysRef.current.clear();
-      dockMarkersRef.current.clear();
-      landmarkMarkersRef.current.clear();
+      ferryMarkerVisualKeys.clear();
+      dockMarkers.clear();
+      landmarkMarkers.clear();
     };
   }, [onSelectDock, onSelectRoute]);
 
@@ -465,6 +510,7 @@ export default function FerryMap({ onSelectRoute, onSelectDock, selectedRouteId,
 
     tileLayer.setUrl(isNight ? NIGHT_TILE_URL : DAY_TILE_URL);
     map.getContainer().classList.toggle("map-theme-night", isNight);
+    map.invalidateSize({ pan: false, animate: false });
   }, [isNight]);
 
   useEffect(() => {
