@@ -313,6 +313,7 @@ export default function FerryMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const usingFallbackTilesRef = useRef(false);
   const ferryMarkersRef = useRef<Map<string, FerryMarkerEntry>>(new Map());
   const stationMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const landmarkMarkersRef = useRef<Map<string, L.Marker>>(new Map());
@@ -371,6 +372,16 @@ export default function FerryMap({
       crossOrigin: true,
     }).addTo(map);
     tileLayerRef.current = tileLayer;
+    tileLayer.on("tileerror", () => {
+      const activeUrl = map.getContainer().classList.contains("map-theme-night") ? NIGHT_TILE_URL : DAY_TILE_URL;
+      if (usingFallbackTilesRef.current || activeUrl === DEFAULT_TILE_URL) return;
+      usingFallbackTilesRef.current = true;
+      map.attributionControl.removeAttribution(TILE_ATTRIBUTION);
+      tileLayer.options.attribution = DEFAULT_TILE_ATTRIBUTION;
+      map.attributionControl.addAttribution(DEFAULT_TILE_ATTRIBUTION);
+      map.getContainer().classList.toggle("map-night-filter", map.getContainer().classList.contains("map-theme-night"));
+      tileLayer.setUrl(DEFAULT_TILE_URL);
+    });
     map.getContainer().classList.toggle("map-theme-night", initialIsNightRef.current);
     map.getContainer().classList.toggle("map-night-filter", initialIsNightRef.current && NIGHT_USES_FILTER);
 
@@ -673,9 +684,9 @@ export default function FerryMap({
     const tileLayer = tileLayerRef.current;
     if (!map || !tileLayer) return;
 
-    tileLayer.setUrl(isNight ? NIGHT_TILE_URL : DAY_TILE_URL);
+    tileLayer.setUrl(usingFallbackTilesRef.current ? DEFAULT_TILE_URL : isNight ? NIGHT_TILE_URL : DAY_TILE_URL);
     map.getContainer().classList.toggle("map-theme-night", isNight);
-    map.getContainer().classList.toggle("map-night-filter", isNight && NIGHT_USES_FILTER);
+    map.getContainer().classList.toggle("map-night-filter", isNight && (usingFallbackTilesRef.current || NIGHT_USES_FILTER));
     map.invalidateSize({ pan: false, animate: false });
   }, [isNight]);
 

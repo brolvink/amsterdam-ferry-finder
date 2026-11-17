@@ -278,6 +278,8 @@
   }
 
   .ac-atmosphere {
+    --cloud-weather-opacity: 1;
+    --cloud-theme-opacity: 1;
     pointer-events: none;
     position: absolute;
     inset: 0;
@@ -306,6 +308,7 @@
   }
 
   .ac-cloud {
+    --cloud-layer-opacity: 1;
     --cloud-px: 10px;
     --cloud-fill: hsl(0 0% 100% / 0.34);
     --cloud-shade: hsl(198 36% 86% / 0.16);
@@ -321,6 +324,8 @@
     width: calc(var(--cloud-px) * 10);
     height: calc(var(--cloud-px) * 4);
     background: var(--cloud-fill);
+    opacity: calc(var(--cloud-layer-opacity) * var(--cloud-weather-opacity) * var(--cloud-theme-opacity));
+    transition: background-color 500ms ease, box-shadow 500ms ease, opacity 500ms ease;
     image-rendering: pixelated;
     animation: drift var(--cloud-duration, 22s) linear infinite;
     box-shadow:
@@ -350,7 +355,11 @@
     content: '';
     position: absolute;
     background: var(--cloud-fill);
+    transition: background-color 500ms ease, box-shadow 500ms ease;
   }
+
+  .ac-cloud--soft { --cloud-layer-opacity: 0.65; }
+  .ac-cloud--faint { --cloud-layer-opacity: 0.5; }
 
   .ac-cloud::before {
     width: calc(var(--cloud-px) * var(--cloud-before-w));
@@ -414,50 +423,21 @@
     width: calc(var(--cloud-px) * 11);
   }
 
-  .ac-water-shimmer {
-    position: absolute;
-    inset: auto 0 0 0;
-    height: 34%;
-    background:
-      linear-gradient(180deg, transparent 0%, hsl(193 56% 58% / 0.15) 25%, hsl(193 56% 58% / 0.26) 100%),
-      repeating-linear-gradient(
-        -8deg,
-        hsl(193 65% 97% / 0.08) 0,
-        hsl(193 65% 97% / 0.08) 3px,
-        transparent 3px,
-        transparent 12px
-      );
-    animation: tide 5s ease-in-out infinite;
+  .ac-atmosphere--night {
+    --cloud-theme-opacity: 0.55;
   }
 
   .ac-atmosphere--night .ac-cloud {
-    --cloud-fill: hsl(209 68% 93% / 0.24);
-    --cloud-shade: hsl(213 38% 70% / 0.18);
-    opacity: 0.38;
+    --cloud-fill: hsl(218 28% 48% / 0.55);
+    --cloud-shade: hsl(220 30% 29% / 0.45);
   }
 
-  .ac-atmosphere--night .ac-water-shimmer {
-    background:
-      linear-gradient(180deg, transparent 0%, hsl(206 58% 46% / 0.12) 25%, hsl(207 66% 28% / 0.35) 100%),
-      repeating-linear-gradient(
-        -8deg,
-        hsl(208 50% 90% / 0.08) 0,
-        hsl(208 50% 90% / 0.08) 3px,
-        transparent 3px,
-        transparent 12px
-      );
+  .ac-atmosphere--cold {
+    --cloud-weather-opacity: 0.7;
   }
 
-  .ac-atmosphere--cold .ac-cloud {
-    opacity: 0.3;
-  }
-
-  .ac-atmosphere--cold .ac-water-shimmer {
-    animation-duration: 7s;
-  }
-
-  .ac-atmosphere--wet .ac-cloud {
-    opacity: 0.22;
+  .ac-atmosphere--wet {
+    --cloud-weather-opacity: 0.6;
   }
 
   .bobbing {
@@ -518,11 +498,6 @@
 @keyframes drift {
   0% { transform: translateX(-220px); }
   100% { transform: translateX(calc(100vw + 260px)); }
-}
-
-@keyframes tide {
-  0%, 100% { opacity: 0.9; }
-  50% { opacity: 0.55; }
 }
 
 /* Leaflet map — warm, soft, Animal Crossing style */

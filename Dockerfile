@@ -7,6 +7,11 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+# Vite embeds these public map settings during the build. Leave them unset to
+# use OpenStreetMap; configure them as build-time variables in Coolify.
+ARG VITE_TILE_URL_DAY
+ARG VITE_TILE_URL_NIGHT
+ARG VITE_TILE_ATTRIBUTION
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
