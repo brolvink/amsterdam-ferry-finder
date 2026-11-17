@@ -1,4 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getSoundEnabled } from "@/lib/preferences";
+import { useSoundEnabled } from "@/lib/usePreference";
+
+const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
+
+function useHasFinePointer() {
+    const [matches, setMatches] = useState(
+        () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(FINE_POINTER_QUERY).matches,
+    );
+
+    useEffect(() => {
+        if (typeof window.matchMedia !== "function") return;
+        const query = window.matchMedia(FINE_POINTER_QUERY);
+        const update = () => setMatches(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
+
+    return matches;
+}
 
 export default function SeagullCursor() {
     const frames = useMemo(() => ["/seagul-1.png", "/seagul-2.png", "/seagul-3.png"], []);
@@ -12,15 +33,16 @@ export default function SeagullCursor() {
     const [frameIndex, setFrameIndex] = useState(0);
     const [framesReady, setFramesReady] = useState(false);
     const [visible, setVisible] = useState(false);
+    const hasFinePointer = useHasFinePointer();
+    const soundEnabled = useSoundEnabled();
 
     const prevPosition = useRef({ x: 0, y: 0 });
     const timeoutRef = useRef<number | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
-    const ambientSoundRef = useRef<HTMLAudioElement | null>(null);
-    const ambientTimeoutRef = useRef<number | null>(null);
     const lastClickSoundRef = useRef(0);
 
     useEffect(() => {
+        if (!hasFinePointer) return;
         let cancelled = false;
 
         const preload = (src: string) =>
@@ -43,7 +65,7 @@ export default function SeagullCursor() {
         return () => {
             cancelled = true;
         };
-    }, [frames]);
+    }, [frames, hasFinePointer]);
 
     useEffect(() => {
         if (!framesReady || !isMoving || isClicked) {
@@ -58,15 +80,24 @@ export default function SeagullCursor() {
         return () => window.clearInterval(interval);
     }, [frames.length, framesReady, isClicked, isMoving]);
 
+    // Hide the real cursor only once the seagull is actually shown.
     useEffect(() => {
+        if (!hasFinePointer || !visible) return;
         document.documentElement.classList.add("seagull-cursor-active");
-        ambientSoundRef.current = new Audio("/seagull-click.mp3");
-        ambientSoundRef.current.preload = "auto";
-        ambientSoundRef.current.volume = 0.06;
+        return () => document.documentElement.classList.remove("seagull-cursor-active");
+    }, [hasFinePointer, visible]);
+
+    // Ambient cries: no timer and no audio at all while muted or on touch-only devices.
+    useEffect(() => {
+        if (!hasFinePointer || !soundEnabled) return;
+
+        const ambient = new Audio("/seagull-click.mp3");
+        ambient.preload = "auto";
+        ambient.volume = 0.06;
+        let timeout: number | null = null;
 
         const playAmbientSeagull = () => {
-            const ambient = ambientSoundRef.current;
-            if (!ambient || document.hidden) return;
+            if (document.hidden || !getSoundEnabled()) return;
 
             ambient.currentTime = 0;
             ambient.playbackRate = 0.92 + Math.random() * 0.18;
@@ -75,7 +106,7 @@ export default function SeagullCursor() {
 
         const scheduleAmbientSeagull = () => {
             const nextDelay = 18000 + Math.random() * 32000;
-            ambientTimeoutRef.current = window.setTimeout(() => {
+            timeout = window.setTimeout(() => {
                 playAmbientSeagull();
                 scheduleAmbientSeagull();
             }, nextDelay);
@@ -83,11 +114,26 @@ export default function SeagullCursor() {
 
         scheduleAmbientSeagull();
 
+        return () => {
+            if (timeout) window.clearTimeout(timeout);
+            ambient.pause();
+        };
+    }, [hasFinePointer, soundEnabled]);
+
+    useEffect(() => {
+        if (!hasFinePointer) {
+            setVisible(false);
+            return;
+        }
+
         const playSeagullClickSound = () => {
             const now = Date.now();
             if (now - lastClickSoundRef.current < 120) return false;
             if (Math.random() > 0.2) return false;
             lastClickSoundRef.current = now;
+
+            // The seagull still reacts visually when muted, it just stays silent.
+            if (!getSoundEnabled()) return true;
 
             const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
             if (!AudioContextCtor) return false;
@@ -140,7 +186,7 @@ export default function SeagullCursor() {
                 if (dx > 1) setIsMovingRight(true);
                 if (dx < -1) setIsMovingRight(false);
 
-                if (!visible) setVisible(true);
+                setVisible(true);
 
                 let targetAngle = Math.atan2(dy, dx) * (180 / Math.PI);
                 if (targetAngle > 90) targetAngle -= 180;
@@ -164,7 +210,9 @@ export default function SeagullCursor() {
             if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
             const didPlayClickSound = playSeagullClickSound();
             setIsClicked(didPlayClickSound);
-            if (!visible) setVisible(true);
+            setPosition({ x: event.clientX, y: event.clientY });
+            prevPosition.current = { x: event.clientX, y: event.clientY };
+            setVisible(true);
         };
 
         const handlePointerUp = (event: PointerEvent) => {
@@ -177,22 +225,18 @@ export default function SeagullCursor() {
         window.addEventListener("pointerup", handlePointerUp);
 
         return () => {
-            document.documentElement.classList.remove("seagull-cursor-active");
             window.removeEventListener("pointermove", handlePointerMove);
             window.removeEventListener("pointerdown", handlePointerDown);
             window.removeEventListener("pointerup", handlePointerUp);
             if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-            if (ambientTimeoutRef.current) window.clearTimeout(ambientTimeoutRef.current);
-            if (ambientSoundRef.current) ambientSoundRef.current.pause();
-            ambientSoundRef.current = null;
             if (audioContextRef.current) {
                 void audioContextRef.current.close();
                 audioContextRef.current = null;
             }
         };
-    }, []);
+    }, [hasFinePointer]);
 
-    if (!visible) return null;
+    if (!hasFinePointer || !visible) return null;
 
     return (
         <div

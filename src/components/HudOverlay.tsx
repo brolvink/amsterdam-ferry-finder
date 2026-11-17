@@ -1,9 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, Wind } from "lucide-react";
-import { ferryRoutes } from "@/data/ferries";
-import type { FerryRoute } from "@/data/ferries";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Moon, Sun, WifiOff, Wind } from "lucide-react";
+import { AMSTERDAM_TIME_ZONE, ferryRoutes, formatAmsterdamTime } from "@/data/ferries";
+import type { FerryRoute, FerryStation } from "@/data/ferries";
 import { useAmsterdamWeather } from "@/hooks/useAmsterdamWeather";
+import { useOnlineStatus } from "@/hooks/useInstallPrompt";
+import { useNow } from "@/hooks/useNow";
+import type { LocationStatus } from "@/hooks/useUserLocation";
 import LofiPlayer from "@/components/LofiPlayer";
+import InstallHint from "@/components/InstallHint";
+import NearMeControl from "@/components/NearMeControl";
+import RouteSlot from "@/components/RouteSlot";
+import type { NearestStation } from "@/lib/geo";
+import { getSoundEnabled } from "@/lib/preferences";
+
+const dateFormatter = new Intl.DateTimeFormat("nl-NL", {
+  weekday: "short",
+  day: "2-digit",
+  month: "short",
+  timeZone: AMSTERDAM_TIME_ZONE,
+});
 
 interface HudOverlayProps {
   onSelectRoute: (route: FerryRoute) => void;
@@ -12,6 +27,10 @@ interface HudOverlayProps {
   isNight: boolean;
   onToggleTheme: () => void;
   onSetThemeMode: (mode: "auto" | "day" | "night") => void;
+  nearMeStatus: LocationStatus;
+  nearest: NearestStation<FerryStation> | null;
+  onNearMe: () => void;
+  onTurnOffNearMe: () => void;
 }
 
 export default function HudOverlay({
@@ -21,8 +40,13 @@ export default function HudOverlay({
   isNight,
   onToggleTheme,
   onSetThemeMode,
+  nearMeStatus,
+  nearest,
+  onNearMe,
+  onTurnOffNearMe,
 }: HudOverlayProps) {
-  const [time, setTime] = useState(new Date());
+  const now = useNow(10_000);
+  const isOnline = useOnlineStatus();
   const [wobbleRouteId, setWobbleRouteId] = useState<string | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const {
@@ -31,22 +55,9 @@ export default function HudOverlay({
     isError: weatherError,
   } = useAmsterdamWeather();
 
-  useEffect(() => {
-    const t = setInterval(() => {
-      setTime(new Date());
-    }, 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const timeStr = time.toLocaleTimeString("nl-NL", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const dateStr = time.toLocaleDateString("nl-NL", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  });
+  // Amsterdam time for every visitor, whatever their own time zone.
+  const timeStr = formatAmsterdamTime(now);
+  const dateStr = dateFormatter.format(now);
   const sortedFerryRoutes = useMemo(
     () =>
       [...ferryRoutes].sort((a, b) => {
@@ -60,7 +71,7 @@ export default function HudOverlay({
     [],
   );
   const playRouteClickSound = useCallback(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !getSoundEnabled()) return;
     const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextCtor) return;
 
@@ -102,59 +113,76 @@ export default function HudOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[1000] flex flex-col p-3 md:p-4 overflow-hidden">
-      {/* Top bar */}
-      <div className="pointer-events-auto wood-panel-dark px-3 py-2 md:px-5 md:py-3 mb-auto ml-auto w-full md:w-fit">
-        <div className="flex items-start justify-between gap-2 md:gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-lg inline-flex items-center leading-none shrink-0">
-                <img src="/ferry-indicator.png" alt="Ferry" className="w-8 h-8 md:w-12 md:h-12" />
-              </span>
-              <h1 className="font-display text-lg md:text-xl font-bold tracking-wide text-amber-100 truncate">
-                ferry.nice
-              </h1>
+      <div className="mb-auto flex flex-col items-end">
+        {/* Top bar */}
+        <div className="pointer-events-auto wood-panel-dark px-3 py-2 md:px-5 md:py-3 w-full md:w-fit">
+          <div className="flex items-start justify-between gap-2 md:gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-lg inline-flex items-center leading-none shrink-0">
+                  <img src="/ferry-indicator.png" alt="Ferry" className="w-8 h-8 md:w-12 md:h-12" />
+                </span>
+                <h1 className="font-display text-lg md:text-xl font-bold tracking-wide text-amber-100 truncate">
+                  ferry.nice
+                </h1>
+              </div>
+              <div className="flex items-center gap-1 md:gap-1.5 shrink-0 mt-2">
+                <button
+                  type="button"
+                  onClick={() => onSetThemeMode("auto")}
+                  className={`hit-44 h-7 px-2 rounded-lg text-[10px]  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 font-bold tracking-wide border transition-colors ${themeMode === "auto"
+                    ? "bg-amber-100/25 text-amber-100 border-amber-100/60"
+                    : "bg-amber-100/8 text-amber-100/80 border-amber-100/30 hover:bg-amber-100/16"
+                    }`}
+                  aria-label="Use automatic day and night mode"
+                >
+                  AUTO
+                </button>
+                <button
+                  type="button"
+                  onClick={onToggleTheme}
+                  className="hit-44 h-7 w-7 md:w-auto md:px-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 border-amber-100/30 bg-amber-100/8 text-amber-100 hover:bg-amber-100/16 transition-colors inline-flex items-center justify-center shrink-0"
+                  aria-label={isNight ? "Switch to day mode" : "Switch to night mode"}
+                >
+                  {isNight ? <Sun size={16} className="md:w-[14px] md:h-[14px]" /> : <Moon size={16} className="md:w-[14px] md:h-[14px]" />}
+                </button>
+                <LofiPlayer />
+              </div>
             </div>
-            <div className="flex items-center gap-1 md:gap-1.5 shrink-0 mt-2">
-              <button
-                type="button"
-                onClick={() => onSetThemeMode("auto")}
-                className={`h-7 px-2 rounded-lg text-[10px] font-bold tracking-wide border transition-colors ${themeMode === "auto"
-                  ? "bg-amber-100/25 text-amber-100 border-amber-100/60"
-                  : "bg-amber-100/8 text-amber-100/80 border-amber-100/30 hover:bg-amber-100/16"
-                  }`}
-                aria-label="Use automatic day and night mode"
-              >
-                AUTO
-              </button>
-              <button
-                type="button"
-                onClick={onToggleTheme}
-                className="h-7 w-7 md:w-auto md:px-2 rounded-lg border border-amber-100/30 bg-amber-100/8 text-amber-100 hover:bg-amber-100/16 transition-colors inline-flex items-center justify-center shrink-0"
-                aria-label={isNight ? "Switch to day mode" : "Switch to night mode"}
-              >
-                {isNight ? <Sun size={16} className="md:w-[14px] md:h-[14px]" /> : <Moon size={16} className="md:w-[14px] md:h-[14px]" />}
-              </button>
-              <LofiPlayer />
-            </div>
-          </div>
 
-          <div className="min-w-[120px] md:min-w-[150px] shrink-0 border-l border-amber-100/20 pl-2 md:pl-3 text-right">
-            <p className="font-display text-lg md:text-xl font-bold text-amber-50 leading-none">
-              {timeStr}
-            </p>
-            <p className="text-amber-100/75 text-[10px] font-semibold">{dateStr}</p>
-            <p className="text-[10px] mt-1 font-semibold text-amber-50/95">
-              {weatherLoading && "Loading weather..."}
-              {weatherError && "Weather unavailable"}
-              {weather && `${Math.round(weather.temperatureC)}°C · ${weather.label}`}
-            </p>
-            {weather && (
-              <p className="text-[9px] text-amber-100/75 font-medium flex items-center justify-end gap-1 mt-0.5">
-                <Wind size={10} />
-                {Math.round(weather.windSpeedKmh)} km/h · feels {Math.round(weather.feelsLikeC)}°C
+            <div className="min-w-[120px] md:min-w-[150px] shrink-0 border-l border-amber-100/20 pl-2 md:pl-3 text-right">
+              <p className="font-display text-lg md:text-xl font-bold text-amber-50 leading-none">
+                {timeStr}
               </p>
-            )}
+              <p className="text-amber-100/75 text-[10px] font-semibold">{dateStr}</p>
+              <p className="text-[10px] mt-1 font-semibold text-amber-50/95">
+                {weatherLoading && "Loading weather..."}
+                {weatherError && "Weather unavailable"}
+                {weather && `${Math.round(weather.temperatureC)}°C · ${weather.label}`}
+              </p>
+              {weather && (
+                <p className="text-[9px] text-amber-100/75 font-medium flex items-center justify-end gap-1 mt-0.5">
+                  <Wind size={10} />
+                  {Math.round(weather.windSpeedKmh)} km/h · feels {Math.round(weather.feelsLikeC)}°C
+                </p>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Status row: Near me, offline and install notes */}
+        <div className="flex flex-wrap items-center justify-end gap-2 mt-2 max-w-full">
+          {!isOnline && (
+            <span
+              className="pointer-events-auto wood-panel-dark inline-flex items-center gap-1.5 !rounded-full px-3 py-1.5 text-[11px] font-bold text-amber-100"
+              role="status"
+            >
+              <WifiOff size={13} aria-hidden="true" />
+              Offline — timetable still works
+            </span>
+          )}
+          <NearMeControl status={nearMeStatus} nearest={nearest} onNearMe={onNearMe} onTurnOff={onTurnOffNearMe} />
+          <InstallHint />
         </div>
       </div>
 
@@ -163,34 +191,18 @@ export default function HudOverlay({
         {/* Route list — like AC inventory slots */}
         <div className="pointer-events-auto flex flex-col gap-1.5 w-full md:w-[210px] md:max-w-[210px] md:items-end">
           <p className="text-amber-100/60 text-[9px] font-bold tracking-widest uppercase md:hidden px-1 text-right">
-            Active Routes
+            Ferry lines
           </p>
-          <div className="flex md:flex-col justify-end md:justify-start gap-2 md:gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar pb-1 md:pb-0 scroll-smooth px-0.5 w-full">
+          <div className="flex md:flex-col justify-start gap-2 md:gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar pb-1 md:pb-0 scroll-smooth px-0.5 w-full">
             {sortedFerryRoutes.map((route) => (
-              <button
+              <RouteSlot
                 key={route.id}
-                onClick={() => handleRouteClick(route)}
-                className={`inventory-slot flex-shrink-0 w-[140px] md:w-full ${selectedRouteId === route.id ? "inventory-slot--active" : ""} ${wobbleRouteId === route.id ? "inventory-slot--wobble" : ""}`}
-                aria-label={`Open ${route.code} route card`}
-              >
-                <div
-                  className={`w-3 h-3 rounded-full shrink-0 shadow-sm ${selectedRouteId === route.id ? "animate-pulse-glow" : ""}`}
-                  style={{
-                    background: route.color,
-                  }}
-                />
-                <div className="min-w-0 flex-1">
-                  <span className="text-[11px] font-bold text-amber-100 block truncate leading-tight">
-                    {route.code}
-                  </span>
-                  <span className="text-[9px] text-amber-100/80 block truncate font-semibold leading-tight">
-                    {route.docks[0].name} ↔ {route.docks[1].name}
-                  </span>
-                </div>
-                {route.status === "active" && (
-                  <span className="ml-auto text-[8px] text-amber-200 font-bold">●</span>
-                )}
-              </button>
+                route={route}
+                now={now}
+                isSelected={selectedRouteId === route.id}
+                isWobbling={wobbleRouteId === route.id}
+                onSelect={handleRouteClick}
+              />
             ))}
           </div>
         </div>

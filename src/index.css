@@ -149,6 +149,25 @@
     font-family: 'Baloo 2', cursive;
   }
 
+  /* Extends a small control's tap area to 44px tall without changing its look or crowding neighbours. */
+  .hit-44 {
+    position: relative;
+  }
+  .hit-44::after {
+    content: '';
+    position: absolute;
+    inset: -8px 0;
+  }
+
+  .float-in {
+    opacity: 0;
+    animation: float-up 0.4s ease-out forwards;
+  }
+
+  .pulse-dot {
+    animation: pulse-glow 1.8s ease-in-out infinite;
+  }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -633,4 +652,24 @@
 
 .leaflet-tooltip::before {
   border-top-color: hsl(31 27% 70%) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bounce-in,
+  .animate-pulse-glow,
+  .pulse-dot,
+  .inventory-slot--active,
+  .inventory-slot--wobble {
+    animation: none;
+  }
+
+  .float-in {
+    opacity: 1;
+    animation: none;
+  }
+
+  .inventory-slot:hover,
+  .inventory-slot:active {
+    transform: none;
+  }
 }

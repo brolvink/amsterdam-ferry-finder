@@ -1,14 +1,26 @@
-import { useState, useCallback, useEffect, useMemo, type CSSProperties } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import FerryMap from "@/components/FerryMap";
 import FerrySchedule from "@/components/FerrySchedule";
 import DockDepartures from "@/components/DockDepartures";
 import HudOverlay from "@/components/HudOverlay";
 import SeagullCursor from "@/components/SeagullCursor";
-import type { FerryDock, FerryRoute } from "@/data/ferries";
+import { ferryRoutes, ferryStations } from "@/data/ferries";
+import { useAmsterdamHour } from "@/hooks/useAmsterdamHour";
 import { useAmsterdamWeather } from "@/hooks/useAmsterdamWeather";
+import { useSelection } from "@/hooks/useSelection";
+import { useUserLocation } from "@/hooks/useUserLocation";
+import { findNearestStation } from "@/lib/geo";
+import { PREFERENCE_KEYS } from "@/lib/preferences";
+import { parseFavorite, selectionEquals, serializeFavorite, type Selection } from "@/lib/selection";
+import { usePreference } from "@/lib/usePreference";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type ThemeMode = "auto" | "day" | "night";
+
+function parseThemeMode(value: string | null): ThemeMode {
+  return value === "day" || value === "night" ? value : "auto";
+}
 type CloudVariant = "ac-cloud--chunky" | "ac-cloud--wide" | "ac-cloud--puffy" | "ac-cloud--flat";
 
 const CLOUD_VARIANTS: CloudVariant[] = ["ac-cloud--chunky", "ac-cloud--wide", "ac-cloud--puffy", "ac-cloud--flat"];
@@ -19,21 +31,84 @@ function pickRandomVariant(previous?: CloudVariant): CloudVariant {
 }
 
 const Index = () => {
-  const [selectedRoute, setSelectedRoute] = useState<FerryRoute | null>(null);
-  const [selectedDock, setSelectedDock] = useState<FerryDock | null>(null);
-  const [themeMode, setThemeMode] = useState<ThemeMode>("auto");
+  const { selection, selectRoute, selectStation, openStation, close } = useSelection();
+  const [storedThemeMode, setStoredThemeMode] = usePreference(PREFERENCE_KEYS.themeMode);
+  const themeMode = parseThemeMode(storedThemeMode);
+  const [storedFavorite, setStoredFavorite] = usePreference(PREFERENCE_KEYS.favorite);
+  const favorite = parseFavorite(storedFavorite);
   const { data: weather } = useAmsterdamWeather();
+  const { status: locationStatus, position, start: startLocation, stop: stopLocation } = useUserLocation();
 
-  const handleSelectRoute = useCallback((route: FerryRoute | null) => {
-    setSelectedDock(null);
-    setSelectedRoute((prev) => (prev?.id === route?.id ? null : route));
-  }, []);
-  const handleSelectDock = useCallback((dock: FerryDock | null) => {
-    setSelectedRoute(null);
-    setSelectedDock((prev) => (prev?.id === dock?.id ? null : dock));
-  }, []);
+  const selectedRoute = selection?.kind === "route" ? (ferryRoutes.find((route) => route.id === selection.id) ?? null) : null;
+  const selectedStation =
+    selection?.kind === "station" ? (ferryStations.find((station) => station.id === selection.id) ?? null) : null;
+  const favoriteStationId = favorite?.kind === "station" ? favorite.id : null;
 
-  const currentHour = new Date().getHours();
+  const handleSetThemeMode = useCallback((mode: ThemeMode) => setStoredThemeMode(mode), [setStoredThemeMode]);
+
+  const toggleFavorite = useCallback(
+    (target: Selection, name: string) => {
+      if (selectionEquals(favorite, target)) {
+        setStoredFavorite(null);
+        toast(`${name} is no longer your dock.`);
+      } else {
+        setStoredFavorite(serializeFavorite(target));
+        toast(`${name} is now your dock. It opens first next time.`);
+      }
+    },
+    [favorite, setStoredFavorite],
+  );
+
+  // Near me: the nearest station, derived from the in-memory position only.
+  const nearest = useMemo(() => (position ? findNearestStation(position, ferryStations) : null), [position]);
+  const nearestRef = useRef(nearest);
+  nearestRef.current = nearest;
+  const openNearestWhenReady = useRef(false);
+  const farAwayNoticeShown = useRef(false);
+
+  const openNearest = useCallback(() => {
+    const info = nearestRef.current;
+    if (info && !info.farAway) openStation(info.station.id);
+  }, [openStation]);
+
+  const handleNearMe = useCallback(() => {
+    if (locationStatus === "on" && nearestRef.current) {
+      openNearest();
+      return;
+    }
+    if (locationStatus === "off") {
+      openNearestWhenReady.current = true;
+      startLocation();
+    }
+  }, [locationStatus, openNearest, startLocation]);
+
+  const handleTurnOffNearMe = useCallback(() => {
+    openNearestWhenReady.current = false;
+    farAwayNoticeShown.current = false;
+    stopLocation();
+  }, [stopLocation]);
+
+  useEffect(() => {
+    if (locationStatus === "off") openNearestWhenReady.current = false;
+  }, [locationStatus]);
+
+  useEffect(() => {
+    if (!nearest) return;
+    if (nearest.farAway) {
+      if (!farAwayNoticeShown.current) {
+        farAwayNoticeShown.current = true;
+        openNearestWhenReady.current = false;
+        toast("You're a long way from the IJ. Come back when you're closer and we'll tell you if you can make the boat.");
+      }
+      return;
+    }
+    if (openNearestWhenReady.current) {
+      openNearestWhenReady.current = false;
+      openStation(nearest.station.id);
+    }
+  }, [nearest, openStation]);
+
+  const currentHour = useAmsterdamHour();
   const fallbackNight = currentHour >= 18 || currentHour < 7;
 
   const autoIsNight = weather ? !weather.isDay : fallbackNight;
@@ -73,13 +148,12 @@ const Index = () => {
   );
 
   const handleToggleTheme = useCallback(() => {
-    setThemeMode((previous) => {
-      if (previous === "auto") {
-        return autoIsNight ? "day" : "night";
-      }
-      return previous === "night" ? "day" : "night";
-    });
-  }, [autoIsNight]);
+    if (themeMode === "auto") {
+      handleSetThemeMode(autoIsNight ? "day" : "night");
+    } else {
+      handleSetThemeMode(themeMode === "night" ? "day" : "night");
+    }
+  }, [autoIsNight, handleSetThemeMode, themeMode]);
 
   return (
     <div
@@ -92,9 +166,12 @@ const Index = () => {
       style={{ minHeight: "100svh", height: "100dvh" }}
     >
       <FerryMap
-        onSelectRoute={handleSelectRoute}
-        onSelectDock={handleSelectDock}
+        onSelectRoute={selectRoute}
+        onSelectStation={selectStation}
         selectedRouteId={selectedRoute?.id ?? null}
+        selectedStationId={selectedStation?.id ?? null}
+        favoriteStationId={favoriteStationId}
+        userLocation={position}
         isNight={isNight}
       />
       <div
@@ -115,25 +192,42 @@ const Index = () => {
       </div>
 
       <HudOverlay
-        onSelectRoute={(r) => handleSelectRoute(r)}
+        onSelectRoute={selectRoute}
         selectedRouteId={selectedRoute?.id ?? null}
         themeMode={themeMode}
         isNight={isNight}
         onToggleTheme={handleToggleTheme}
-        onSetThemeMode={setThemeMode}
+        onSetThemeMode={handleSetThemeMode}
+        nearMeStatus={locationStatus}
+        nearest={nearest}
+        onNearMe={handleNearMe}
+        onTurnOffNearMe={handleTurnOffNearMe}
       />
 
       <SeagullCursor />
 
       {selectedRoute && (
         <div className="absolute right-3 md:right-4 z-[1001] w-[min(20rem,calc(100vw-1.5rem))] md:w-80" style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
-          <FerrySchedule route={selectedRoute} onClose={() => setSelectedRoute(null)} />
+          <FerrySchedule
+            key={selectedRoute.id}
+            route={selectedRoute}
+            onClose={close}
+            isFavorite={selectionEquals(favorite, { kind: "route", id: selectedRoute.id })}
+            onToggleFavorite={() => toggleFavorite({ kind: "route", id: selectedRoute.id }, `Ferry ${selectedRoute.code}`)}
+          />
         </div>
       )}
 
-      {selectedDock && (
+      {selectedStation && (
         <div className="absolute right-3 md:right-4 z-[1001] w-[min(20rem,calc(100vw-1.5rem))] md:w-80" style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
-          <DockDepartures dock={selectedDock} onClose={() => setSelectedDock(null)} />
+          <DockDepartures
+            key={selectedStation.id}
+            station={selectedStation}
+            onClose={close}
+            userLocation={position}
+            isFavorite={selectionEquals(favorite, { kind: "station", id: selectedStation.id })}
+            onToggleFavorite={() => toggleFavorite({ kind: "station", id: selectedStation.id }, selectedStation.name)}
+          />
         </div>
       )}
     </div>
