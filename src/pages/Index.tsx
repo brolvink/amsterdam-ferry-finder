@@ -186,9 +186,8 @@ const Index = () => {
       >
         {isNight ? <div className="ac-moon-glow" /> : <div className="ac-sun-glow" />}
         <div className={cn("ac-cloud", cloudVariants[0])} style={{ top: "5%", animationDelay: "-2s" }} />
-        <div className={cn("ac-cloud", cloudVariants[1])} style={{ top: "12%", animationDelay: "-11s", opacity: 0.65 }} />
-        <div className={cn("ac-cloud", cloudVariants[2])} style={{ top: "18%", animationDelay: "-6s", opacity: 0.5 }} />
-        <div className="ac-water-shimmer" />
+        <div className={cn("ac-cloud", "ac-cloud--soft", cloudVariants[1])} style={{ top: "12%", animationDelay: "-11s" }} />
+        <div className={cn("ac-cloud", "ac-cloud--faint", cloudVariants[2])} style={{ top: "18%", animationDelay: "-6s" }} />
       </div>
 
       <HudOverlay

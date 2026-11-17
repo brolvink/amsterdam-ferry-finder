@@ -51,3 +51,5 @@ GitHub Actions workflow: `.github/workflows/ferry-schedule-refresh.yml` (Mondays
 ## Docker
 
 This repo includes a production-ready `Dockerfile` + `nginx.conf` for serving the built SPA.
+
+To use a custom map in Coolify, set `VITE_TILE_URL_DAY` and `VITE_TILE_ATTRIBUTION` as build-time environment variables. Optionally set `VITE_TILE_URL_NIGHT` for a separate night map. Vite embeds these values in the public browser bundle, so restrict any provider key to the site's domain. With no custom URL, the app uses OpenStreetMap; it also falls back to OpenStreetMap if a custom tile request fails. Rebuild and redeploy after changing these variables.
