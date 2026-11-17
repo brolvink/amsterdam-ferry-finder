@@ -2,12 +2,22 @@ name: Refresh Ferry Schedule
 
 on:
   schedule:
+    # Mondays 04:00 UTC. Every successful run commits (meta.lastChecked changes), which also
+    # keeps the repository active so GitHub does not disable this schedule after 60 days.
     - cron: "0 4 * * 1"
   workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ferry-schedule-refresh
+  cancel-in-progress: false
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -16,7 +26,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -26,12 +36,13 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Update ferry schedule
+        # Exits non-zero (and writes nothing) only when every route failed.
         run: npm run update:ferry-schedules
 
       - name: Commit changes
         run: |
-          if git diff --quiet; then
-            echo "No changes to commit"
+          if git diff --quiet -- src/data/ferryScheduleData.ts; then
+            echo "Schedule file unchanged; nothing to commit"
             exit 0
           fi
 
@@ -39,4 +50,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/data/ferryScheduleData.ts
           git commit -m "chore: refresh ferry schedule data"
+          git pull --rebase
           git push

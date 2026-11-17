@@ -1,0 +1,101 @@
+/* Map-specific styles for FerryMap.tsx (station markers, selection, user location). */
+
+.station-marker {
+  background: none;
+  border: none;
+}
+
+.station-marker__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.station-marker__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.2s ease;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Selected: soft pulsing ring plus a slight lift. */
+.station-marker--selected .station-marker__img {
+  transform: scale(1.08);
+}
+
+.station-marker--selected .station-marker__inner::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 3px solid rgba(245, 177, 61, 0.95);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 14px rgba(245, 177, 61, 0.7);
+  pointer-events: none;
+  animation: station-marker-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes station-marker-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.65;
+  }
+}
+
+/* Favourite: small star badge at the top right. */
+.station-marker__star {
+  display: none;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 13px;
+  color: #f5b13d;
+  background: #fffaf0;
+  border: 2px solid #f5b13d;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.station-marker--favorite .station-marker__star {
+  display: block;
+}
+
+/* Ferries of other routes fade back while a route is selected. */
+.ferry-marker {
+  transition: opacity 0.25s ease;
+}
+
+.ferry-marker--dim {
+  opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .station-marker--selected .station-marker__inner::before {
+    animation: none;
+  }
+  .station-marker__img,
+  .ferry-marker {
+    transition: none;
+  }
+}
+
+/* Night mode without a dedicated dark tile set: darken the day tiles in place. */
+/* The extra .weather-theme class outranks the weather tints in index.css. */
+.weather-theme .leaflet-container.map-night-filter .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.92) saturate(0.55);
+}
+.leaflet-container.map-night-filter {
+  background: #1a1f2b;
+}

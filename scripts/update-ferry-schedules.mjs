@@ -1,3 +1,22 @@
+// Refreshes src/data/ferryScheduleData.ts from GVB's public timetable API.
+//
+// What it does, per route and per direction (= per departure dock):
+//   1. GetLineByNumber -> the line's routes (one per direction) and their first stop.
+//   2. GetTimeTablesForStop for a three-week window -> departure times per calendar date.
+//   3. For each weekday, keeps the departure pattern seen most often in that window (so a
+//      single holiday in the window does not overwrite a normal weekday).
+//   4. Stores minutes since the service day's midnight; GVB's departureDayOffset=1 sailings
+//      (after midnight, same service day) become values >= 1440.
+//
+// Failure handling: a route that fails (network, unexpected stop, implausible data) keeps its
+// existing data from the current file. If every route fails, nothing is written and the
+// script exits non-zero. meta.lastChecked is set on every successful run, meta.lastUpdated
+// only when timetable content changed.
+//
+// Env:
+//   PLAYWRIGHT_CHROMIUM_EXECUTABLE  optional path to a Chromium binary (when the Playwright-
+//                                   managed browser is not installed).
+
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,392 +28,570 @@ const repoRoot = path.resolve(__dirname, "..");
 const scheduleFilePath = path.join(repoRoot, "src", "data", "ferryScheduleData.ts");
 const GVB_TIMETABLE_URL = "https://gvb.nl/en/travel-information/stops-and-timetable";
 const GVB_API_BASE = "https://gvb.nl/api/gvb-shared-services/travelinformation/api/v1/Timetable";
+const SOURCE_LABEL = "https://gvb.nl/en/travel-information/stops-and-timetable (GVB timetable APIs via browser automation)";
+const TIME_ZONE = "Europe/Amsterdam";
+const WINDOW_DAYS = 21;
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const routeDefaults = [
-  { id: "f1", frequency: "Every 5 min", duration: 4, operatingHours: "24/7", status: "active" },
-  { id: "f2", frequency: "Every 8 min", duration: 5, operatingHours: "06:30 - 00:00", status: "active" },
-  { id: "f3", frequency: "Every 10-30 min", duration: 14, operatingHours: "07:00 - 02:00", status: "active" },
-  { id: "f4", frequency: "Every 15 min", duration: 6, operatingHours: "06:30 - 22:30 (Mon-Fri)", status: "active" },
-  { id: "f5", frequency: "Every 20 min", duration: 6, operatingHours: "06:30 - 22:30", status: "active" },
-  { id: "f6", frequency: "Every 20 min", duration: 9, operatingHours: "06:30 - 22:30", status: "active" },
+// Route ids do not match public codes: f1=F3/901, f2=F2/902, f3=F4/906, f4=F6/900, f5=F1/915, f6=F7/903.
+// GVB's "Outbound"/"Inbound" labels are not consistent across lines, and lines 901 and 906 share the
+// Centraal Station stop code, so departure stops are mapped to app dock ids per (line, stopCode).
+const ROUTES = [
+  {
+    id: "f1",
+    line: "901",
+    dockByStop: { "NL:S:30009903": "cs-buik", "NL:S:30009906": "buik" },
+    defaults: { frequency: "Every 5 min", duration: 4, operatingHours: "24/7", status: "active" },
+  },
+  {
+    id: "f2",
+    line: "902",
+    dockByStop: { "NL:S:30009910": "cs-east", "NL:S:30009911": "ijplein" },
+    defaults: { frequency: "Every 8 min", duration: 5, operatingHours: "06:30 - 00:00", status: "active" },
+  },
+  {
+    id: "f3",
+    line: "906",
+    dockByStop: { "NL:S:30009903": "cs-ndsm", "NL:S:30009902": "ndsm" },
+    defaults: { frequency: "Every 10-30 min", duration: 14, operatingHours: "07:00 - 02:00", status: "active" },
+  },
+  {
+    id: "f4",
+    line: "900",
+    dockByStop: { "NL:S:30009900": "pontsteiger", "NL:S:30009901": "distel" },
+    defaults: { frequency: "Every 15 min", duration: 6, operatingHours: "06:30 - 22:30 (Mon-Fri)", status: "active" },
+  },
+  {
+    id: "f5",
+    line: "915",
+    dockByStop: { "NL:S:30009925": "azartplein", "NL:S:30009915": "zamenhof" },
+    defaults: { frequency: "Every 20 min", duration: 6, operatingHours: "06:30 - 22:30", status: "active" },
+  },
+  {
+    id: "f6",
+    line: "903",
+    dockByStop: { "NL:S:30009900": "pontsteiger", "NL:S:30009902": "ndsm" },
+    defaults: { frequency: "Every 20 min", duration: 9, operatingHours: "06:30 - 22:30", status: "active" },
+  },
 ];
 
-const allowedStatuses = new Set(["active", "delayed", "offline"]);
-const routeLineMap = [
-  { id: "f1", linePlanningNumber: "901" },
-  { id: "f2", linePlanningNumber: "902" },
-  { id: "f3", linePlanningNumber: "906" },
-  { id: "f4", linePlanningNumber: "900" },
-  { id: "f5", linePlanningNumber: "915" },
-  { id: "f6", linePlanningNumber: "903" },
-];
+const DATA_BEGIN = "/* BEGIN GENERATED DATA */";
+const DATA_END = "/* END GENERATED DATA */";
 
-function escapeString(value) {
-  return String(value).replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
-}
+// ---------------------------------------------------------------------------
+// Data file I/O
 
 function extractCurrentData(tsContent) {
-  const match = tsContent.match(/const ferryScheduleData: FerryScheduleData = (\{[\s\S]*\});\n\nexport default ferryScheduleData;/m);
-  if (!match) {
-    throw new Error("Could not parse current ferry schedule file.");
+  const start = tsContent.indexOf(DATA_BEGIN);
+  const end = tsContent.indexOf(DATA_END);
+  if (start !== -1 && end > start) {
+    return JSON.parse(tsContent.slice(start + DATA_BEGIN.length, end));
   }
 
-  // Controlled local file content; evaluate object literal to preserve existing metadata.
-  return new Function(`return (${match[1]});`)();
+  // Legacy format (object literal, pre-timetable). Only used once for migration.
+  const legacy = tsContent.match(/const ferryScheduleData: FerryScheduleData = (\{[\s\S]*\});\n\nexport default ferryScheduleData;/m);
+  if (legacy) {
+    return new Function(`return (${legacy[1]});`)();
+  }
+
+  throw new Error("Could not parse current ferry schedule file.");
 }
 
-function normalizeRoute(rawRoute, fallback) {
-  const duration = Number(rawRoute?.duration);
-  const status = typeof rawRoute?.status === "string" ? rawRoute.status : fallback.status;
+function formatDataJson(data) {
+  // Pretty JSON, but keep arrays of numbers on one line so the file stays compact.
+  return JSON.stringify(data, null, 2).replace(/\[\s*(-?\d+(?:\s*,\s*-?\d+)*)\s*\]/g, (_, inner) =>
+    `[${inner.replace(/\s+/g, "")}]`
+  );
+}
 
+function renderScheduleDataTs(data) {
+  return `// Generated by scripts/update-ferry-schedules.mjs. Edit by hand only if you know why.
+
+export type FerryRouteStatus = "active" | "delayed" | "offline";
+
+export interface FerryScheduleMeta {
+  source: string;
+  /** When the timetable content last changed. */
+  lastUpdated: string;
+  /** When the updater last successfully checked GVB (set on every successful run). */
+  lastChecked?: string;
+  refreshCadence: "daily" | "weekly";
+  /** Calendar dates (Amsterdam) the timetable was sampled from. */
+  window?: { from: string; to: string };
+}
+
+/**
+ * Real departures for one route.
+ * patterns: sorted minutes since the service day's midnight (Amsterdam wall clock).
+ *   Values >= 1440 are after-midnight sailings that belong to the previous service day.
+ * docks: per departure dock id, 7 pattern indexes for Mon..Sun (index 0 = Monday); -1 = no service.
+ */
+export interface FerryRouteTimetable {
+  patterns: number[][];
+  docks: Record<string, number[]>;
+}
+
+export interface FerryScheduleEntry {
+  id: string;
+  frequency: string;
+  duration: number;
+  operatingHours: string;
+  status: FerryRouteStatus;
+  timetable?: FerryRouteTimetable;
+}
+
+export interface FerryScheduleData {
+  meta: FerryScheduleMeta;
+  routes: FerryScheduleEntry[];
+}
+
+const ferryScheduleData: FerryScheduleData = ${DATA_BEGIN}
+${formatDataJson(data)}
+${DATA_END};
+
+export default ferryScheduleData;
+`;
+}
+
+// ---------------------------------------------------------------------------
+// Amsterdam calendar helpers (never use the machine's local timezone)
+
+const amsDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function amsterdamDateKey(date) {
+  return amsDateFormatter.format(date); // YYYY-MM-DD
+}
+
+function dateKeyToUtcDay(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  return Date.UTC(y, m - 1, d) / 86400000;
+}
+
+function utcDayToDateKey(day) {
+  return new Date(day * 86400000).toISOString().slice(0, 10);
+}
+
+/** Monday = 0 ... Sunday = 6, from a YYYY-MM-DD key. */
+function weekdayIndexOfDateKey(key) {
+  return (new Date(dateKeyToUtcDay(key) * 86400000).getUTCDay() + 6) % 7;
+}
+
+function getFetchWindow(now = new Date()) {
+  const todayDay = dateKeyToUtcDay(amsterdamDateKey(now));
+  const monday = todayDay - weekdayIndexOfDateKey(utcDayToDateKey(todayDay));
+  const from = utcDayToDateKey(monday);
+  const to = utcDayToDateKey(monday + WINDOW_DAYS - 1);
   return {
-    id: fallback.id,
-    frequency:
-      typeof rawRoute?.frequency === "string" && rawRoute.frequency.trim().length > 0
-        ? rawRoute.frequency.trim()
-        : fallback.frequency,
-    duration: Number.isFinite(duration) && duration > 0 ? duration : fallback.duration,
-    operatingHours:
-      typeof rawRoute?.operatingHours === "string" && rawRoute.operatingHours.trim().length > 0
-        ? rawRoute.operatingHours.trim()
-        : fallback.operatingHours,
-    status: allowedStatuses.has(status) ? status : fallback.status,
+    from,
+    to,
+    // Tuesday noon of the first week: a time every line is sailing, for journey durations.
+    journeyProbe: `${utcDayToDateKey(monday + 1)}T12:00:00Z`,
   };
 }
 
-function normalizeIncomingData(payload, currentData) {
-  const cadence = "weekly";
-  const source =
-    payload?.meta?.source ??
-    payload?.source ??
-    currentData?.meta?.source ??
-    "GVB official timetable (auto-synced)";
+// ---------------------------------------------------------------------------
+// Timetable processing (pure)
 
-  let incomingRoutes = [];
-  if (Array.isArray(payload?.routes)) {
-    incomingRoutes = payload.routes;
-  } else if (payload?.routes && typeof payload.routes === "object") {
-    incomingRoutes = Object.entries(payload.routes).map(([id, route]) => ({ id, ...route }));
-  } else if (Array.isArray(payload)) {
-    incomingRoutes = payload;
-  }
-
-  const routeMap = new Map(incomingRoutes.map((route) => [route.id, route]));
-  const routes = routeDefaults.map((fallback) => normalizeRoute(routeMap.get(fallback.id), fallback));
-
-  return {
-    meta: {
-      source,
-      refreshCadence: cadence,
-      lastUpdated:
-        payload?.meta?.lastUpdated ??
-        payload?.lastUpdated ??
-        new Date().toISOString(),
-    },
-    routes,
-  };
-}
-
-function parseTimeToMinutes(timeValue) {
-  if (typeof timeValue !== "string" || !timeValue.includes(":")) {
-    return null;
-  }
-
-  const [hoursRaw, minutesRaw] = timeValue.split(":");
-  const hours = Number(hoursRaw);
-  const minutes = Number(minutesRaw);
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    return null;
-  }
-
+function parseClock(value) {
+  const match = typeof value === "string" ? value.match(/^(\d{1,2}):(\d{2})$/) : null;
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
   return hours * 60 + minutes;
 }
 
-function formatMinutesClock(totalMinutes) {
+function formatClock(totalMinutes) {
   const wrapped = ((totalMinutes % 1440) + 1440) % 1440;
-  const hours = String(Math.floor(wrapped / 60)).padStart(2, "0");
-  const minutes = String(wrapped % 60).padStart(2, "0");
-  return `${hours}:${minutes}`;
+  return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
+}
+
+/** GVB timeTables[] -> Map(dateKey -> sorted unique minutes since service-day midnight). */
+function minutesByDate(timeTables) {
+  const result = new Map();
+  for (const day of timeTables ?? []) {
+    const dateKey = typeof day?.date === "string" ? day.date.slice(0, 10) : null;
+    if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue;
+    const minutes = new Set(result.get(dateKey) ?? []);
+    for (const hourBlock of day?.hours ?? []) {
+      const offset = Number(hourBlock?.departureDayOffset) || 0;
+      for (const item of hourBlock?.times ?? []) {
+        const clock = parseClock(item?.time);
+        if (clock !== null) minutes.add(clock + offset * 1440);
+      }
+    }
+    result.set(dateKey, [...minutes].sort((a, b) => a - b));
+  }
+  return result;
+}
+
+/** Pick, per weekday (Mon=0), the pattern seen most often in the window; ties go to the earliest date. */
+function weeklyPatternFromDates(byDate, window) {
+  const week = [];
+  for (let weekday = 0; weekday < 7; weekday++) {
+    const counts = new Map();
+    const dates = [...byDate.keys()]
+      .filter((key) => key >= window.from && key <= window.to && weekdayIndexOfDateKey(key) === weekday)
+      .sort();
+    for (const key of dates) {
+      const signature = byDate.get(key).join(",");
+      const entry = counts.get(signature) ?? { count: 0, minutes: byDate.get(key) };
+      entry.count += 1;
+      counts.set(signature, entry);
+    }
+    let best = null;
+    for (const entry of counts.values()) {
+      if (!best || entry.count > best.count) best = entry;
+    }
+    week.push(best ? best.minutes : null);
+  }
+  return week;
+}
+
+function buildTimetable(weekByDock) {
+  const patterns = [];
+  const signatures = new Map();
+  const docks = {};
+  for (const [dockId, week] of Object.entries(weekByDock)) {
+    docks[dockId] = week.map((minutes) => {
+      if (!minutes || minutes.length === 0) return -1;
+      const signature = minutes.join(",");
+      if (!signatures.has(signature)) {
+        signatures.set(signature, patterns.length);
+        patterns.push(minutes);
+      }
+      return signatures.get(signature);
+    });
+  }
+  return { patterns, docks };
+}
+
+function dayMinutes(timetable, dockId, weekday) {
+  const index = timetable.docks[dockId]?.[weekday] ?? -1;
+  return index >= 0 ? timetable.patterns[index] : [];
+}
+
+function deriveFrequency(timetable) {
+  const intervals = [];
+  for (const dockId of Object.keys(timetable.docks)) {
+    for (let weekday = 0; weekday < 7; weekday++) {
+      const minutes = dayMinutes(timetable, dockId, weekday);
+      for (let i = 1; i < minutes.length; i++) {
+        const diff = minutes[i] - minutes[i - 1];
+        if (diff > 0 && diff <= 120) intervals.push(diff);
+      }
+    }
+  }
+  if (!intervals.length) return null;
+
+  const counts = new Map();
+  for (const interval of intervals) counts.set(interval, (counts.get(interval) ?? 0) + 1);
+  const topCount = Math.max(...counts.values());
+  const common = [...counts.entries()]
+    .filter(([, count]) => count >= topCount * 0.35)
+    .map(([interval]) => interval)
+    .sort((a, b) => a - b);
+  const min = common[0];
+  const max = common[common.length - 1];
+  return min === max ? `Every ${min} min` : `Every ${min}-${max} min`;
+}
+
+function formatDayRange(start, end) {
+  if (start === end) return WEEKDAY_LABELS[start];
+  return `${WEEKDAY_LABELS[start]}-${WEEKDAY_LABELS[end]}`;
+}
+
+/** Human-readable operating hours, grouping consecutive weekdays with the same span. */
+function deriveOperatingHours(timetable) {
+  const spans = [];
+  for (let weekday = 0; weekday < 7; weekday++) {
+    let first = Infinity;
+    let last = -Infinity;
+    for (const dockId of Object.keys(timetable.docks)) {
+      const minutes = dayMinutes(timetable, dockId, weekday);
+      if (minutes.length) {
+        first = Math.min(first, minutes[0]);
+        last = Math.max(last, minutes[minutes.length - 1]);
+      }
+    }
+    spans.push(Number.isFinite(first) ? { first, last } : null);
+  }
+  if (spans.every((span) => span === null)) return null;
+
+  // Around the clock: every day has service and each day's last sailing is within an hour
+  // of the next service day's first sailing.
+  const roundTheClock = spans.every((span, weekday) => {
+    const next = spans[(weekday + 1) % 7];
+    return span && next && next.first + 1440 - span.last <= 60;
+  });
+  if (roundTheClock) return "24/7";
+
+  const groups = [];
+  for (let weekday = 0; weekday < 7; weekday++) {
+    const span = spans[weekday];
+    const label = span ? `${formatClock(span.first)} - ${formatClock(span.last)}` : null;
+    const previous = groups[groups.length - 1];
+    if (previous && previous.label === label) {
+      previous.end = weekday;
+    } else {
+      groups.push({ start: weekday, end: weekday, label });
+    }
+  }
+
+  const serviceGroups = groups.filter((group) => group.label !== null);
+  if (serviceGroups.length === 1) {
+    const [group] = serviceGroups;
+    return group.start === 0 && group.end === 6
+      ? group.label
+      : `${group.label} (${formatDayRange(group.start, group.end)})`;
+  }
+  return serviceGroups.map((group) => `${formatDayRange(group.start, group.end)} ${group.label}`).join(", ");
 }
 
 function median(values) {
-  if (!values.length) {
-    return null;
-  }
-
+  if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const center = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 1 ? sorted[center] : Math.round((sorted[center - 1] + sorted[center]) / 2);
 }
 
-function deriveFrequencyFromTimeTables(timeTables) {
-  const intervals = [];
-
-  for (const day of timeTables ?? []) {
-    const dailyMinutes = [];
-    for (const hourBlock of day?.hours ?? []) {
-      const offset = Number(hourBlock?.departureDayOffset) || 0;
-      for (const timeItem of hourBlock?.times ?? []) {
-        const minutes = parseTimeToMinutes(timeItem?.time);
-        if (minutes !== null) {
-          dailyMinutes.push(minutes + offset * 1440);
-        }
-      }
-    }
-
-    dailyMinutes.sort((a, b) => a - b);
-    for (let i = 1; i < dailyMinutes.length; i++) {
-      const diff = dailyMinutes[i] - dailyMinutes[i - 1];
-      if (diff > 0 && diff <= 120) {
-        intervals.push(diff);
-      }
-    }
-  }
-
-  if (!intervals.length) {
-    return null;
-  }
-
-  const counts = new Map();
-  for (const interval of intervals) {
-    counts.set(interval, (counts.get(interval) ?? 0) + 1);
-  }
-
-  const topCount = Math.max(...counts.values());
-  const commonIntervals = [...counts.entries()]
-    .filter(([, count]) => count >= topCount * 0.35)
-    .map(([interval]) => interval)
-    .sort((a, b) => a - b);
-
-  const sourceIntervals = commonIntervals.length ? commonIntervals : [...counts.keys()].sort((a, b) => a - b);
-  const minInterval = sourceIntervals[0];
-  const maxInterval = sourceIntervals[sourceIntervals.length - 1];
-  if (minInterval === maxInterval) {
-    return `Every ${minInterval} min`;
-  }
-
-  return `Every ${minInterval}-${maxInterval} min`;
-}
-
-function deriveOperatingHoursFromTimeTables(timeTables) {
-  const departures = [];
-  const daysWithService = new Set();
-
-  for (const day of timeTables ?? []) {
-    const dayDate = day?.date;
-    let dayHasService = false;
-    for (const hourBlock of day?.hours ?? []) {
-      const offset = Number(hourBlock?.departureDayOffset) || 0;
-      for (const timeItem of hourBlock?.times ?? []) {
-        const minutes = parseTimeToMinutes(timeItem?.time);
-        if (minutes !== null) {
-          departures.push(minutes + offset * 1440);
-          dayHasService = true;
-        }
-      }
-    }
-
-    if (dayHasService && typeof dayDate === "string") {
-      daysWithService.add(dayDate.slice(0, 10));
-    }
-  }
-
-  if (!departures.length) {
-    return null;
-  }
-
-  const first = Math.min(...departures);
-  const last = Math.max(...departures);
-  const span = last - first;
-  if (daysWithService.size >= 7 && span >= 23 * 60) {
-    return "24/7";
-  }
-
-  return `${formatMinutesClock(first)} - ${formatMinutesClock(last)}`;
-}
-
-function deriveDurationFromJourney(journeyPayload) {
+function journeyDurations(journeyPayload) {
   const durations = [];
   for (const journey of journeyPayload?.simpleJourneys ?? []) {
-    if (!Array.isArray(journey) || journey.length < 2) {
-      continue;
-    }
-
-    const first = journey[0];
-    const last = journey[journey.length - 1];
-    const departureText = first?.plannedDepartureDatetime ?? first?.actualDepartureDatetime;
-    const arrivalText = last?.plannedArrivalDatetime ?? last?.actualArrivalDatetime;
-    if (!departureText || !arrivalText) {
-      continue;
-    }
-
-    const departure = new Date(departureText).getTime();
-    const arrival = new Date(arrivalText).getTime();
-    if (!Number.isFinite(departure) || !Number.isFinite(arrival)) {
-      continue;
-    }
-
-    const durationMinutes = Math.round((arrival - departure) / 60000);
-    if (durationMinutes > 0 && durationMinutes <= 120) {
-      durations.push(durationMinutes);
-    }
+    if (!Array.isArray(journey) || journey.length < 2) continue;
+    const departureText = journey[0]?.plannedDepartureDatetime;
+    const arrivalText = journey[journey.length - 1]?.plannedArrivalDatetime;
+    const departure = Date.parse(departureText ?? "");
+    const arrival = Date.parse(arrivalText ?? "");
+    if (!Number.isFinite(departure) || !Number.isFinite(arrival)) continue;
+    const minutes = Math.round((arrival - departure) / 60000);
+    if (minutes > 0 && minutes <= 120) durations.push(minutes);
   }
-
-  return median(durations);
+  return durations;
 }
 
-async function fetchJsonInPage(page, url) {
-  const result = await page.evaluate(async (requestUrl) => {
-    const response = await fetch(requestUrl, { credentials: "include" });
-    const text = await response.text();
-    return {
-      ok: response.ok,
-      status: response.status,
-      statusText: response.statusText,
-      text,
-    };
-  }, url);
-
-  if (!result.ok) {
-    throw new Error(`Request failed (${result.status} ${result.statusText}) for ${url}`);
-  }
-
-  return JSON.parse(result.text);
-}
-
-function getCurrentWeekRange() {
-  const now = new Date();
-  const day = now.getDay();
-  const mondayOffset = (day + 6) % 7;
-  const monday = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  monday.setUTCDate(monday.getUTCDate() - mondayOffset);
-
-  const sunday = new Date(monday);
-  sunday.setUTCDate(sunday.getUTCDate() + 6);
-  sunday.setUTCHours(23, 59, 59, 999);
-
-  return {
-    startDate: monday.toISOString(),
-    endDate: sunday.toISOString(),
-    startDateTime: new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0, 0))
-      .toISOString()
-      .replace(/\.\d{3}Z$/, "Z"),
-  };
-}
-
-async function fetchRouteUpdate(page, mapping) {
-  const lineDetailsUrl = `${GVB_API_BASE}/GetLineByNumber?dataOwnerCode=GVB&linePlanningNumber=${encodeURIComponent(mapping.linePlanningNumber)}`;
-  const lineDetails = await fetchJsonInPage(page, lineDetailsUrl);
-  const route = lineDetails?.routes?.find((candidate) => candidate?.direction === "Outbound") ?? lineDetails?.routes?.[0];
-
-  const stopCode = route?.stops?.[0]?.stopCode;
-  const direction = route?.direction;
-  if (!stopCode || !direction) {
-    throw new Error(`Missing route stop data for line ${mapping.linePlanningNumber}`);
-  }
-
-  const { startDate, endDate, startDateTime } = getCurrentWeekRange();
-  const timetableUrl =
-    `${GVB_API_BASE}/GetTimeTablesForStop?linePlanningNumber=${encodeURIComponent(mapping.linePlanningNumber)}` +
-    `&stopCode=${encodeURIComponent(stopCode)}` +
-    `&direction=${encodeURIComponent(direction)}` +
-    `&startDate=${encodeURIComponent(startDate)}` +
-    `&endDate=${encodeURIComponent(endDate)}`;
-  const journeyUrl =
-    `${GVB_API_BASE}/GetTimeTableJourneyInTimeColumns?dataOwnerCode=GVB` +
-    `&linePlanningNumber=${encodeURIComponent(mapping.linePlanningNumber)}` +
-    `&direction=${encodeURIComponent(direction)}` +
-    `&startDateTime=${encodeURIComponent(startDateTime)}` +
-    `&invertDirections=false`;
-
-  const [timetableData, journeyData] = await Promise.all([
-    fetchJsonInPage(page, timetableUrl),
-    fetchJsonInPage(page, journeyUrl),
-  ]);
-
-  return {
-    id: mapping.id,
-    frequency: deriveFrequencyFromTimeTables(timetableData?.timeTables),
-    operatingHours: deriveOperatingHoursFromTimeTables(timetableData?.timeTables),
-    duration: deriveDurationFromJourney(journeyData),
-    status: "active",
-  };
-}
-
-async function fetchRemoteSchedule() {
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  const page = await context.newPage();
-
-  try {
-    await page.goto(GVB_TIMETABLE_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
-
-    const updates = [];
-    for (const mapping of routeLineMap) {
-      try {
-        const update = await fetchRouteUpdate(page, mapping);
-        updates.push(update);
-      } catch (error) {
-        console.warn(
-          `Failed to fetch line ${mapping.linePlanningNumber} for ${mapping.id}:`,
-          error instanceof Error ? error.message : error
-        );
+/** Throws when freshly fetched data looks like a partial outage rather than a real timetable. */
+function assertPlausible(routeDef, timetable, previous) {
+  const expectedDocks = Object.values(routeDef.dockByStop);
+  for (const dockId of expectedDocks) {
+    const week = timetable.docks[dockId];
+    if (!week) throw new Error(`no timetable for dock ${dockId}`);
+    if (week.every((index) => index < 0)) throw new Error(`dock ${dockId} has no departures all week`);
+    const previousWeek = previous?.timetable?.docks?.[dockId];
+    if (previousWeek) {
+      for (let weekday = 0; weekday < 7; weekday++) {
+        if (previousWeek[weekday] >= 0 && week[weekday] < 0) {
+          throw new Error(`dock ${dockId} lost all ${WEEKDAY_LABELS[weekday]} departures (previously had service)`);
+        }
       }
     }
-
-    return {
-      meta: {
-        source: "https://gvb.nl/en/travel-information/stops-and-timetable (GVB timetable APIs via browser automation)",
-        refreshCadence: "weekly",
-        lastUpdated: new Date().toISOString(),
-      },
-      routes: updates,
-    };
-  } finally {
-    await context.close();
-    await browser.close();
   }
 }
 
-function renderScheduleDataTs(data) {
-  const routeBlocks = data.routes
-    .map(
-      (route) => `    {\n      id: "${escapeString(route.id)}",\n      frequency: "${escapeString(route.frequency)}",\n      duration: ${route.duration},\n      operatingHours: "${escapeString(route.operatingHours)}",\n      status: "${escapeString(route.status)}",\n    },`
-    )
-    .join("\n");
+// ---------------------------------------------------------------------------
+// Network
 
-  return `export type FerryRouteStatus = "active" | "delayed" | "offline";\n\nexport interface FerryScheduleMeta {\n  source: string;\n  lastUpdated: string;\n  refreshCadence: "daily" | "weekly";\n}\n\nexport interface FerryScheduleEntry {\n  id: string;\n  frequency: string;\n  duration: number;\n  operatingHours: string;\n  status: FerryRouteStatus;\n}\n\nexport interface FerryScheduleData {\n  meta: FerryScheduleMeta;\n  routes: FerryScheduleEntry[];\n}\n\nconst ferryScheduleData: FerryScheduleData = {\n  meta: {\n    source: "${escapeString(data.meta.source)}",\n    lastUpdated: "${escapeString(data.meta.lastUpdated)}",\n    refreshCadence: "${escapeString(data.meta.refreshCadence)}",\n  },\n  routes: [\n${routeBlocks}\n  ],\n};\n\nexport default ferryScheduleData;\n`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+class GvbSession {
+  constructor(page) {
+    this.page = page;
+  }
+
+  async open() {
+    await this.page.goto(GVB_TIMETABLE_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await this.page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+  }
+
+  async fetchJson(url, attempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        const result = await this.page.evaluate(async (requestUrl) => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 30000);
+          try {
+            const response = await fetch(requestUrl, { credentials: "include", signal: controller.signal });
+            return { ok: response.ok, status: response.status, text: await response.text() };
+          } finally {
+            clearTimeout(timer);
+          }
+        }, url);
+        if (!result.ok) {
+          const error = new Error(`HTTP ${result.status} for ${url}`);
+          error.status = result.status;
+          throw error;
+        }
+        return JSON.parse(result.text);
+      } catch (error) {
+        lastError = error;
+        if (attempt === attempts) break;
+        const status = error?.status;
+        if (status && status >= 400 && status < 500 && status !== 403 && status !== 429) break; // not transient
+        console.warn(`  retry ${attempt}/${attempts - 1}: ${error instanceof Error ? error.message : error}`);
+        await sleep(1500 * attempt);
+        // A 403 usually means the WAF cookie expired or the page context broke: reload the page.
+        if (status === 403 || !status) await this.open().catch(() => {});
+      }
+    }
+    throw lastError;
+  }
 }
+
+async function fetchRoute(session, routeDef, window, previous) {
+  const lineUrl = `${GVB_API_BASE}/GetLineByNumber?dataOwnerCode=GVB&linePlanningNumber=${encodeURIComponent(routeDef.line)}`;
+  const lineDetails = await session.fetchJson(lineUrl);
+  const gvbRoutes = Array.isArray(lineDetails?.routes) ? lineDetails.routes : [];
+  if (gvbRoutes.length === 0) throw new Error("line has no routes");
+
+  const weekByDock = {};
+  const durations = [];
+  for (const gvbRoute of gvbRoutes) {
+    const stopCode = gvbRoute?.stops?.[0]?.stopCode;
+    const direction = gvbRoute?.direction;
+    const dockId = routeDef.dockByStop[stopCode];
+    if (!direction || !dockId) {
+      throw new Error(`unexpected departure stop ${stopCode} (${gvbRoute?.stops?.[0]?.name}) for direction ${direction}`);
+    }
+    if (weekByDock[dockId]) throw new Error(`two directions depart from dock ${dockId}`);
+
+    const timetableUrl =
+      `${GVB_API_BASE}/GetTimeTablesForStop?linePlanningNumber=${encodeURIComponent(routeDef.line)}` +
+      `&stopCode=${encodeURIComponent(stopCode)}` +
+      `&direction=${encodeURIComponent(direction)}` +
+      `&startDate=${encodeURIComponent(`${window.from}T00:00:00.000Z`)}` +
+      `&endDate=${encodeURIComponent(`${window.to}T23:59:59.999Z`)}`;
+    const timetableData = await session.fetchJson(timetableUrl);
+    const byDate = minutesByDate(timetableData?.timeTables);
+    if (byDate.size === 0) throw new Error(`empty timetable for ${direction} from ${dockId}`);
+    const week = weeklyPatternFromDates(byDate, window);
+    if (week.some((day) => day === null)) throw new Error(`timetable for ${dockId} is missing weekdays`);
+    weekByDock[dockId] = week;
+
+    const journeyUrl =
+      `${GVB_API_BASE}/GetTimeTableJourneyInTimeColumns?dataOwnerCode=GVB` +
+      `&linePlanningNumber=${encodeURIComponent(routeDef.line)}` +
+      `&direction=${encodeURIComponent(direction)}` +
+      `&startDateTime=${encodeURIComponent(window.journeyProbe)}` +
+      `&invertDirections=false`;
+    try {
+      durations.push(...journeyDurations(await session.fetchJson(journeyUrl)));
+    } catch (error) {
+      console.warn(`  journey durations unavailable for ${direction}: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  const timetable = buildTimetable(
+    Object.fromEntries(Object.values(routeDef.dockByStop).map((dockId) => [dockId, weekByDock[dockId]]).filter(([, week]) => week))
+  );
+  assertPlausible(routeDef, timetable, previous);
+
+  const fallback = previous ?? routeDef.defaults;
+  return {
+    id: routeDef.id,
+    frequency: deriveFrequency(timetable) ?? fallback.frequency,
+    duration: median(durations) ?? fallback.duration,
+    operatingHours: deriveOperatingHours(timetable) ?? fallback.operatingHours,
+    status: "active",
+    timetable,
+  };
+}
+
+function describeRoute(route) {
+  if (!route.timetable) return `${route.id}: no timetable`;
+  const perDock = Object.entries(route.timetable.docks)
+    .map(([dockId, week]) => {
+      const counts = week.map((index) => (index >= 0 ? route.timetable.patterns[index].length : 0));
+      return `${dockId} [${counts.join("/")}]`;
+    })
+    .join("  ");
+  return `${route.id}: ${route.frequency}, ${route.duration} min, ${route.operatingHours}  ${perDock}`;
+}
+
+// ---------------------------------------------------------------------------
 
 async function main() {
   const currentContent = await readFile(scheduleFilePath, "utf8");
   const currentData = extractCurrentData(currentContent);
+  const currentRoutes = new Map((currentData.routes ?? []).map((route) => [route.id, route]));
+  const window = getFetchWindow();
+  console.log(`Fetching GVB timetables for ${window.from} .. ${window.to}`);
 
-  const payload = await fetchRemoteSchedule();
-  const nextData = normalizeIncomingData(payload, currentData);
-  const currentComparable = JSON.stringify({
-    meta: {
-      source: currentData.meta.source,
-      refreshCadence: currentData.meta.refreshCadence,
-    },
-    routes: currentData.routes,
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined,
   });
-  const nextComparable = JSON.stringify({
-    meta: {
-      source: nextData.meta.source,
-      refreshCadence: nextData.meta.refreshCadence,
-    },
-    routes: nextData.routes,
-  });
+  const fetched = new Map();
+  try {
+    const page = await (await browser.newContext()).newPage();
+    const session = new GvbSession(page);
+    let opened = false;
+    for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
+      try {
+        await session.open();
+        opened = true;
+      } catch (error) {
+        console.warn(`Opening GVB page failed (attempt ${attempt}): ${error instanceof Error ? error.message : error}`);
+        if (attempt < 3) await sleep(3000 * attempt);
+      }
+    }
+    if (!opened) throw new Error("Could not open the GVB timetable page.");
 
-  if (currentComparable === nextComparable) {
-    console.log("No schedule changes detected.");
-    return;
+    for (const routeDef of ROUTES) {
+      try {
+        fetched.set(routeDef.id, await fetchRoute(session, routeDef, window, currentRoutes.get(routeDef.id)));
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        console.warn(`Route ${routeDef.id} (line ${routeDef.line}) failed, keeping existing data: ${reason}`);
+        if (process.env.GITHUB_ACTIONS) {
+          // Surfaces on the (green) run summary, so a route stuck on old data is visible.
+          console.log(`::warning title=Route kept::${routeDef.id} (line ${routeDef.line}): ${reason.replace(/[\r\n]+/g, " ")}`);
+        }
+      }
+    }
+  } finally {
+    await browser.close();
   }
 
+  if (fetched.size === 0) {
+    console.error("Every route failed; leaving the schedule file untouched.");
+    process.exit(1);
+  }
+
+  const routes = ROUTES.map((routeDef) => {
+    if (fetched.has(routeDef.id)) return fetched.get(routeDef.id);
+    const existing = currentRoutes.get(routeDef.id);
+    return existing ? { ...existing, id: routeDef.id } : { id: routeDef.id, ...routeDef.defaults };
+  });
+
+  const nowIso = new Date().toISOString();
+  const contentChanged =
+    JSON.stringify(routes) !== JSON.stringify(currentData.routes) || currentData.meta?.source !== SOURCE_LABEL;
+  const allFresh = fetched.size === ROUTES.length;
+
+  const nextData = {
+    meta: {
+      source: SOURCE_LABEL,
+      lastUpdated: contentChanged ? nowIso : (currentData.meta?.lastUpdated ?? nowIso),
+      lastChecked: nowIso,
+      refreshCadence: "weekly",
+      // Only claim the new sampling window when every route was refreshed from it.
+      window: allFresh ? { from: window.from, to: window.to } : (currentData.meta?.window ?? { from: window.from, to: window.to }),
+    },
+    routes,
+  };
+
   await writeFile(scheduleFilePath, renderScheduleDataTs(nextData), "utf8");
-  console.log("Ferry schedule data updated.");
+  for (const route of routes) console.log(`  ${fetched.has(route.id) ? "fresh" : "KEPT "} ${describeRoute(route)}`);
+  console.log(
+    `${contentChanged ? "Timetable content changed" : "No timetable changes"}; ` +
+      `${fetched.size}/${ROUTES.length} routes refreshed; lastChecked=${nowIso}.`
+  );
 }
 
 main().catch((error) => {
