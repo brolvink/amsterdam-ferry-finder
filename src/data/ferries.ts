@@ -212,14 +212,14 @@ const routeWaypoints: Record<string, [number, number][]> = {
 export const ferryDocks: FerryDock[] = [
   { id: "cs-ndsm", name: "Centraal Station", lat: 52.38084352843545, lng: 4.89917802825759, stationId: "cs" },
   { id: "cs-buik", name: "Centraal Station", lat: 52.3807188117236, lng: 4.899427901507475, stationId: "cs" },
-  { id: "cs-east", name: "Centraal Station (East)", lat: 52.3784191027723, lng: 4.9055495479905, stationId: "cs-east" },
+  { id: "cs-east", name: "Centraal Station (East)", lat: 52.3786952, lng: 4.9057531, stationId: "cs-east" },
   { id: "buik", name: "Buiksloterweg", lat: 52.382235464529835, lng: 4.903109850398619, stationId: "buik" },
-  { id: "ndsm", name: "NDSM", lat: 52.4013290166148, lng: 4.890924271312947, stationId: "ndsm" },
-  { id: "pontsteiger", name: "Pontsteiger", lat: 52.39267111816572, lng: 4.886411014175174, stationId: "pontsteiger" },
+  { id: "ndsm", name: "NDSM", lat: 52.40106, lng: 4.89110, stationId: "ndsm" },
+  { id: "pontsteiger", name: "Pontsteiger", lat: 52.39215, lng: 4.88607, stationId: "pontsteiger" },
   { id: "distel", name: "Distelweg", lat: 52.39578749178729, lng: 4.89649611976632, stationId: "distel" },
-  { id: "ijplein", name: "IJplein", lat: 52.38171899630089, lng: 4.908356748760325, stationId: "ijplein" },
+  { id: "ijplein", name: "IJplein", lat: 52.3816808, lng: 4.908295, stationId: "ijplein" },
   { id: "zamenhof", name: "Zamenhofstraat", lat: 52.38481138360226, lng: 4.930879460839123, stationId: "zamenhof" },
-  { id: "azartplein", name: "Azartplein", lat: 52.37770533239611, lng: 4.937446977362498, stationId: "azartplein" },
+  { id: "azartplein", name: "Azartplein", lat: 52.3781058, lng: 4.9371481, stationId: "azartplein" },
 ];
 
 /** One entry per physical station; Centraal Station's two IJ docks (about 20 m apart) are merged. */

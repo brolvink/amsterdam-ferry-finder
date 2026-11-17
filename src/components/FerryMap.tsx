@@ -213,17 +213,19 @@ interface StationIconSpec {
   url: string;
   base: number;
   min: number;
+  // The point where the artwork meets the ground, as a fraction of the image.
+  anchor: [number, number];
 }
 
 /** The special icons are keyed by dock id; a station uses the icon of its first matching dock. */
 function getStationIconSpec(station: FerryStation): StationIconSpec {
   if (station.dockIds.includes(CENTRAL_EAST_DOCK_ID)) {
-    return { url: NACO_HUISJE_ICON_URL, base: BASE_CENTRAL_EAST_ICON_SIZE, min: MIN_CENTRAL_EAST_ICON_SIZE };
+    return { url: NACO_HUISJE_ICON_URL, base: BASE_CENTRAL_EAST_ICON_SIZE, min: MIN_CENTRAL_EAST_ICON_SIZE, anchor: [0.51, 0.58] };
   }
   if (station.dockIds.some((id) => SHORT_LINE_STOP_IDS.has(id))) {
-    return { url: AZARTPLEIN_ICON_URL, base: BASE_SHORT_LINE_STOP_ICON_SIZE, min: MIN_SHORT_LINE_STOP_ICON_SIZE };
+    return { url: AZARTPLEIN_ICON_URL, base: BASE_SHORT_LINE_STOP_ICON_SIZE, min: MIN_SHORT_LINE_STOP_ICON_SIZE, anchor: [0.51, 0.9] };
   }
-  return { url: CS_DOCK_ICON_URL, base: BASE_DOCK_ICON_SIZE, min: MIN_DOCK_ICON_SIZE };
+  return { url: CS_DOCK_ICON_URL, base: BASE_DOCK_ICON_SIZE, min: MIN_DOCK_ICON_SIZE, anchor: [0.64, 0.87] };
 }
 
 function getStationClassName(isSelected: boolean, isFavorite: boolean): string {
@@ -239,14 +241,16 @@ function createStationIcon(
   isFavorite: boolean
 ) {
   const spec = getStationIconSpec(station);
-  const { size, half } = getMarkerIconSizeForZoom(zoom, baseZoom, spec.base, spec.min, compact);
+  const { size } = getMarkerIconSizeForZoom(zoom, baseZoom, spec.base, spec.min, compact);
+  const anchorX = Math.round(size * spec.anchor[0]);
+  const anchorY = Math.round(size * spec.anchor[1]);
 
   return L.divIcon({
     className: getStationClassName(isSelected, isFavorite),
     html: `<div class="station-marker__inner"><img class="station-marker__img" src="${spec.url}" alt="" draggable="false" /><span class="station-marker__star" aria-hidden="true">&#9733;</span></div>`,
     iconSize: [size, size],
-    iconAnchor: [half, half],
-    tooltipAnchor: [0, -Math.round(half + 4)],
+    iconAnchor: [anchorX, anchorY],
+    tooltipAnchor: [Math.round(size / 2) - anchorX, -anchorY - 4],
   });
 }
 
